@@ -1,0 +1,185 @@
+sample:
+  sample_id: synthetic-001
+  experiment_id: demo-exp
+  microstructure_id: micro-001
+  load_path_id: uniaxial-z
+  schema_version: "0.1"
+  coordinate:
+    name: sample
+    axes: [x, y, z]
+    units: m
+  unit_system:
+    length: m
+    stress: Pa
+    time: s
+  tensor_order: ["11", "22", "33", "12", "13", "23"]
+  orientation:
+    representation: quaternion
+    convention: scalar_first
+    angle_units: null
+    crystal_symmetry: cubic
+sources:
+  - path: experiment.csv
+    table_name: measured_observations
+    source_kind: measured
+    modality: time_series
+    format: csv
+    delimiter: ","
+    encoding: utf-8
+    column_map:
+      increment_id: increment
+      time: time_s
+      stress_33: stress_pa
+      strain_33: strain
+    units:
+      increment_id: "1"
+      time: s
+      stress_33: Pa
+      strain_33: "1"
+    coordinate_frame: sample
+    axis_order: [time]
+    native_layout: comma_delimited_columns
+    license: synthetic
+  - path: grains.csv
+    table_name: grains
+    source_kind: measured
+    modality: orientation_map
+    format: csv
+    delimiter: ","
+    encoding: utf-8
+    column_map:
+      grain_id: grain
+      phase_id: phase
+      q0: q0
+      q1: q1
+      q2: q2
+      q3: q3
+    units:
+      grain_id: "1"
+      phase_id: "1"
+      q0: "1"
+      q1: "1"
+      q2: "1"
+      q3: "1"
+    coordinate_frame: sample
+    axis_order: [grain]
+    native_layout: comma_delimited_columns
+    license: synthetic
+assets:
+  - asset_id: dic-points
+    path: dic.csv
+    parent_asset_id: null
+    source_kind: measured
+    layer: raw
+    modality: point_field
+    format: csv
+    units: {x: m, y: m, u: m, v: m}
+    coordinate_frame: sample
+    axis_order: [point, component]
+    native_layout: point_records
+    license: synthetic
+    lossy_transformations: []
+    adapter_config:
+      format: csv
+      delimiter: ","
+      coordinate_columns: [x, y]
+      field_columns: [u, v]
+      units: {x: m, y: m, u: m, v: m}
+      coordinate_frame: sample
+      axis_order: [point, component]
+  - asset_id: ct-voxels
+    path: voxel.json
+    parent_asset_id: null
+    source_kind: measured
+    layer: raw
+    modality: voxel_grid
+    format: json
+    units: {spacing: m}
+    coordinate_frame: sample
+    axis_order: [z, y, x]
+    native_layout: json_nested_array
+    license: synthetic
+    lossy_transformations: []
+    adapter_config:
+      format: json
+      dtype: uint8
+      origin: [0.0, 0.0, 0.0]
+      spacing: [1.0, 1.0, 1.0]
+      axis_order: [z, y, x]
+      units: m
+      coordinate_frame: sample
+  - asset_id: mesh-raw
+    path: mesh.inp
+    parent_asset_id: null
+    source_kind: input
+    layer: raw
+    modality: mesh
+    format: inp
+    units: {length: m}
+    coordinate_frame: sample
+    axis_order: [record]
+    native_layout: abaqus_keywords
+    license: synthetic
+    lossy_transformations: []
+    adapter_config: {}
+  - asset_id: mesh-input
+    path: mesh.inp
+    parent_asset_id: mesh-raw
+    source_kind: input
+    layer: solver_input
+    modality: mesh
+    format: inp
+    units: {length: m}
+    coordinate_frame: sample
+    axis_order: [record]
+    native_layout: abaqus_keywords
+    license: synthetic
+    lossy_transformations: [assigned synthetic solver sets]
+    adapter_config: {}
+solver_inputs:
+  microstructure_mapping:
+    "1": [1]
+    "2": [1]
+  material_model: synthetic_elastic_cp_placeholder
+  material_parameters: {elastic_modulus: 1.0, poisson_ratio: 0.3}
+  orientation_required: true
+  boundary_conditions: [fixed-origin]
+  load_steps: [uniaxial-z]
+  output_variables: [S, LE, PEEQ, SDV]
+  inp_replacements:
+    HEADING: Synthetic multimodal smoke model
+    NODES: |-
+      *NODE
+      1, 0., 0., 0.
+      2, 1., 0., 0.
+      3, 1., 1., 0.
+      4, 0., 1., 0.
+      5, 0., 0., 1.
+      6, 1., 0., 1.
+      7, 1., 1., 1.
+      8, 0., 1., 1.
+    ELEMENTS: |-
+      *ELEMENT, TYPE=C3D8, ELSET=ALL
+      1, 1, 2, 3, 4, 5, 6, 7, 8
+    MATERIALS: |-
+      *MATERIAL, NAME=SYNTHETIC
+      *ELASTIC
+      1.0, 0.3
+      *SOLID SECTION, ELSET=ALL, MATERIAL=SYNTHETIC
+    BOUNDARY_CONDITIONS: |-
+      *BOUNDARY
+      1, 1, 3, 0.0
+    OUTPUT_REQUESTS: |-
+      *STEP, NAME=SMOKE
+      *STATIC
+      0.1, 1.0
+      *OUTPUT, FIELD
+      *ELEMENT OUTPUT
+      S, LE, PEEQ, SDV
+      *END STEP
+abaqus:
+  command: [abaqus]
+  job_name: synthetic
+  template_path: ../../configs/templates/cpfe_template.inp
+export:
+  formats: [hdf5, npz]

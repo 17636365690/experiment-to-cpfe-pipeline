@@ -1,0 +1,19 @@
+{
+  "extraction_version": "0.1",
+  "odb_path": "synthetic/job.odb",
+  "odb_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "requested_fields": ["S", "LE", "STATEV"],
+  "missing_fields": ["STATEV"],
+  "sample_metadata": {
+    "sample_id": "synthetic-odb-001",
+    "experiment_id": "demo-exp",
+    "microstructure_id": "micro-001",
+    "load_path_id": "uniaxial-z",
+    "schema_version": "0.1",
+    "coordinate": {"name": "sample", "axes": ["x", "y", "z"], "units": "m"},
+    "unit_system": {"length": "m", "stress": "Pa", "time": "s"},
+    "tensor_order": ["11", "22", "33", "12", "13", "23"],
+    "orientation": {"representation": "quaternion", "convention": "scalar_first", "angle_units": null, "crystal_symmetry": "cubic"},
+    "sources": []
+  }
+}

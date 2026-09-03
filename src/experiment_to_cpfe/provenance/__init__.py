@@ -1,0 +1,1 @@
+"""Hashing and manifest helpers."""

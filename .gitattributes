@@ -1,0 +1,8 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.h5 binary
+*.hdf5 binary
+*.npy binary
+*.npz binary
+*.odb binary

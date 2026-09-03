@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "experiment-to-cpfe"
+version = "0.1.0"
+description = "A provenance-preserving experiment-to-multiphysics data pipeline."
+requires-python = ">=3.12"
+dependencies = [
+    "h5py",
+    "numpy",
+    "pandas",
+    "pydantic>=2,<3",
+    "PyYAML",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "pytest",
+]
+ml = [
+    "torch",
+    "torch-geometric",
+]
+
+[project.scripts]
+pipeline = "experiment_to_cpfe.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

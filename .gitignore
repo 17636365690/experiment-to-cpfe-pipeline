@@ -1,0 +1,51 @@
+# Python caches and test output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and package builds
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# Local editor and operating-system files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Local runs, logs, secrets, and checkpoints
+runs/
+*.log
+.env
+.env.*
+*.pem
+*.key
+checkpoints/
+*.ckpt
+*.pt
+*.pth
+
+# Abaqus and solver-generated artifacts
+*.odb
+*.cae
+*.sim
+*.lck
+*.res
+*.prt
+*.mdl
+*.stt
+*.abq
+*.pac
+*.sel
+*.sta
+*.msg
+*.dat
+*.com
+
+# Local research working material is not part of the public package
+docs/research/

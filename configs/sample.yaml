@@ -1,0 +1,17 @@
+# Copy and edit this template; all paths are resolved relative to this file.
+sample:
+  sample_id: replace-me
+  experiment_id: replace-me
+  microstructure_id: replace-me
+  load_path_id: replace-me
+  schema_version: "0.1"
+  coordinate: {name: sample, axes: [x, y, z], units: m}
+  unit_system: {length: m, stress: Pa, time: s}
+  tensor_order: ["11", "22", "33", "12", "13", "23"]
+  orientation: {representation: quaternion, convention: scalar_first, angle_units: null, crystal_symmetry: cubic}
+sources: []
+abaqus:
+  command: [abaqus]
+  job_name: replace-me
+export:
+  formats: [hdf5]
