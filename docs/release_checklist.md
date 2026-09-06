@@ -3,7 +3,10 @@
 This checklist applies to the complete upload candidate, including tracked files,
 non-ignored new files, build contents and reachable Git history. A previous test
 count or scan does not certify later changes. Use the final dated verification
-report to record the exact commit/worktree, commands, outputs and hashes.
+report to record the source version, commands, outputs and artifact checks.
+
+The first formal release is `v0.1.0`. Its current evidence is recorded in
+[the release verification](verification/2026-09-06-v0.1.0-release.md).
 
 ## Technical gates
 
@@ -55,8 +58,13 @@ report to record the exact commit/worktree, commands, outputs and hashes.
 - [ ] Stage only the reviewed candidate, inspect the staged diff, commit and push
   only after the required technical/public-file gates pass.
 - [ ] Verify remote CI on the uploaded commit and report the commit and run link.
+- [ ] Include Apache-2.0 `LICENSE`, project `NOTICE`, third-party attribution and
+  SPDX package metadata, using the scope recorded in [licensing.md](licensing.md).
+- [ ] Check package metadata with `python -m twine check --strict <dist-files>`.
+- [ ] Publish a new annotated version tag and GitHub Release after both CI jobs
+  pass, attaching the verified wheel and sdist and version-specific install links.
+- [ ] Download the published attachments and verify their contents and installation.
 
-The project-wide license is currently undecided. This does not prevent reviewing
-or hosting the source, but it must not be represented as an open-source license
-grant. Obtain the owner's license selection before adding a `LICENSE` or package
-license declaration. External source licenses cover those external materials only.
+The owner authorized license selection and the first GitHub release. Apache-2.0
+applies to project code; the listed public tensile case materials use CC-BY-4.0.
+PyPI publication is a separate follow-up.

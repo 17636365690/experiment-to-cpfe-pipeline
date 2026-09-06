@@ -8,6 +8,8 @@ version = "0.1.0"
 description = "A provenance-preserving experiment-to-multiphysics data pipeline."
 readme = "README.md"
 requires-python = ">=3.12"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md"]
 dependencies = [
     "h5py",
     "numpy",
@@ -19,6 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "build",
+    "twine",
     "pytest",
     "scipy",
     "openpyxl",
@@ -29,6 +32,13 @@ ml = [
     "torch",
     "torch-geometric",
 ]
+
+[project.urls]
+Repository = "https://github.com/17636365690/experiment-to-cpfe-pipeline"
+Documentation = "https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/README.md"
+Issues = "https://github.com/17636365690/experiment-to-cpfe-pipeline/issues"
+Changelog = "https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/CHANGELOG.md"
+Releases = "https://github.com/17636365690/experiment-to-cpfe-pipeline/releases"
 
 [project.scripts]
 pipeline = "experiment_to_cpfe.cli:main"

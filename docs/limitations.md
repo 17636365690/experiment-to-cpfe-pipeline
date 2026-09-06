@@ -84,7 +84,7 @@ compile/link path. The recorded synthetic elastic solve exercises ODB extraction
 and HDF5/NPZ packaging against an analytic elastic result. Public experimental
 CPFE validation remains a separate work item.
 
-Project-wide license selection awaits the owner's decision. External MIT and
-CC-BY labels describe their respective sources. Build and test evidence is
-recorded in the [release checklist](release_checklist.md) and dated verification
-reports.
+Project code uses Apache-2.0. The [license review](licensing.md) describes the
+CC-BY-4.0 public tensile materials and separately licensed external inputs.
+Build and test evidence is recorded in the [release checklist](release_checklist.md)
+and dated verification reports.
