@@ -1,15 +1,13 @@
 # License review for v0.1.0
 
-The owner authorized license selection and the first formal GitHub release.
-Project code, documentation and synthetic fixtures use **Apache-2.0**, with
+Project code, documentation and synthetic fixtures use Apache-2.0, with
 the public tensile materials listed in
-[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) under **CC-BY-4.0**.
+[THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) under CC-BY-4.0.
 
 Apache-2.0 permits reuse, modification and redistribution, including commercial
-use, and provides an explicit contributor patent grant. This supports reuse
-of the pipeline in research and engineering software. Its attribution and
-redistribution conditions are set out in the [license text](../LICENSE).
-The decision follows the current ownership and dependency review.
+use, and provides an explicit contributor patent grant. These terms suit reuse
+in research and engineering software. See the [license text](../LICENSE) for
+attribution and redistribution requirements.
 
 ## Source and dependency review
 
@@ -31,10 +29,9 @@ The installed direct dependency metadata was reviewed on 2026-09-06:
 | Development/build | pytest 9.1.1, build 1.6.0, setuptools 78.1.0 | MIT |
 | Release metadata check | twine 7.0.0 | Apache-2.0 |
 
-These are review-environment versions, rather than a dependency lock. Pip
-installs dependencies as separate distributions carrying their own notices;
-they are not incorporated into the project's Apache-2.0 grant. The archive
-review checks the actual package contents for bundled source or binaries.
+The table records the review environment. Installation requirements are in
+`pyproject.toml`. Each dependency retains its own license and ships with its
+upstream notices.
 
 ## Public experimental materials
 
@@ -45,19 +42,15 @@ The project's processed figures, result summary and reference INP use
 CC-BY-4.0 as listed there; the preparation and training scripts use Apache-2.0.
 The original archive and raw experimental files remain in local source storage.
 
-The NTNU manifest remains an external MIT-licensed source reference. Other
-datasets mentioned in verification reports are local-read evidence; their
-source files are supplied separately.
+The NTNU manifest references an MIT-licensed input bundle. Other datasets in
+the adapter reports are obtained from their publishers for local reading tests.
 
 ## Distribution metadata
 
 The Python wheel and sdist declare `License-Expression: Apache-2.0` and ship
 `LICENSE`, `NOTICE` and `THIRD_PARTY_NOTICES.md`. The case files listed under
 CC-BY-4.0 are distributed through the GitHub source tree and its source archives.
-Versioned README links lead package users to those materials and their terms.
-
-Earlier audit reports describe the license as pending at the time of those
-audits. This review records the completed selection for v0.1.0.
+The README links to those files and their terms.
 
 References: [Apache licensing FAQ](https://www.apache.org/foundation/license-faq),
 [Apache-2.0 terms](https://www.apache.org/licenses/LICENSE-2.0),

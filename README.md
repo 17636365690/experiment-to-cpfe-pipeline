@@ -1,8 +1,8 @@
 # Experiment-to-CPFE Pipeline
 
-A dataset-neutral, provenance-preserving Python pipeline for moving experimental and microstructure assets through validation, solver-input preparation, real Abaqus execution, result extraction, and machine-learning dataset export.
+Python tools for reading experimental and microstructure data, preparing Abaqus inputs, extracting solver results and building machine-learning datasets.
 
-Each dataset declares its units, coordinates, tensor order, orientation conventions and evidence sources. Stress-strain curves serve as calibration or validation targets. Solver preparation uses an explicit material model and boundary conditions, and result extraction reads the recorded Abaqus outputs.
+Data records carry units, coordinates, tensor order, orientation conventions and sources through each processing step. Stress-strain curves provide calibration and validation targets. Abaqus models use the supplied material parameters, mesh and boundary conditions.
 
 Version 0.1 provides an offline multimodal pipeline and an opt-in Abaqus backend. Checked solver inputs include flat isotropic-elastic, isotropic-plastic and explicit UMAT models, with grain-orientation mapping to initialized STATEV entries. The [format guide](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/data-modalities.md) lists implemented readers and formats retained as native assets. [Operating conditions](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/limitations.md) describe supported solver profiles and data requirements.
 
@@ -54,8 +54,8 @@ python -m pip install -e ".[native]"
 pipeline adapt --config examples/synthetic_native/imports.yaml --run-dir runs/native-example
 ```
 
-The report separates decoded values from unresolved physical meaning. Checked
-arrays enter the existing pipeline through an `imports` list. See the
+The report shows the values read and any missing physical declarations.
+Add eligible arrays to a sample through its `imports` list. See the
 [native adapter guide](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/native-adapters.md) for selectors and examples.
 
 ## Public experiment to neural surrogate
@@ -85,12 +85,16 @@ python -m pip install -e ".[training]"
 pipeline train-surrogate --config training.json --run-dir runs/trained-model
 ```
 
-The training configuration names the dataset, feature/target units and model
-settings. Each parameter case keeps one train, validation or test assignment.
+The training configuration specifies the dataset, feature and target units,
+and model settings. Each parameter case belongs to one split: train, validation
+or test.
 
 ## Offline synthetic example
 
-The public example contains tiny synthetic CSV, JSON and INP files. It exercises a mechanical time series, grain orientations, a DIC point field, voxels, a mesh asset, readiness checks, INP rendering and HDF5 export. Values carry the `input` evidence class and a `synthetic` source description, including records placed in the reserved `measured_observations` table.
+The example uses small synthetic CSV, JSON and INP files to exercise a mechanical
+time series, grain orientations, DIC points, voxels and a mesh. All values are
+marked `input` with a `synthetic` source, including those stored in the
+`measured_observations` table.
 
 The mechanical example uses small-strain linear elasticity and requests `E`.
 Finite-strain models can request `LE` with its corresponding measure and definition.
@@ -120,19 +124,22 @@ HDF5 is the canonical package. NPZ/PyG exports preserve its tables, assets,
 units and source records. PyG uses explicitly supplied graph arrays and feature
 metadata, as described in the native adapter guide.
 
-## Public-data boundary
+## Data and documentation
 
-The repository contains generic code, schemas, configuration templates, synthetic fixtures, tests and documentation. Research data, solver outputs, material cards and machine-specific run records belong in local data/run directories, with their source and license information.
+The repository includes code, templates, synthetic examples and the documented
+KupferDigital case. Store research inputs and solver outputs in local data or
+run directories, together with their source and license records.
 
 See [the schema guide](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/schema.md), [data modality guide](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/data-modalities.md), and [runbook](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/runbook.md).
 
-The [release checklist](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/release_checklist.md) records the publication gates.
+The [release checklist](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/release_checklist.md) covers testing, packaging and publication.
 
 ## License
 
 Project code, documentation and synthetic fixtures are licensed under
-[Apache-2.0](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/LICENSE), with the public tensile case materials listed in
-[THIRD_PARTY_NOTICES.md](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/THIRD_PARTY_NOTICES.md) distributed under CC-BY-4.0.
-That notice records the KupferDigital authors, source version and processing.
-Dependencies and external inputs retain their own licenses. See the
-[license review](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/licensing.md) and [changelog](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/CHANGELOG.md).
+[Apache-2.0](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/LICENSE). The public tensile figures, result summary and reference
+INP use CC-BY-4.0. [Third-party notices](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/THIRD_PARTY_NOTICES.md) give the file
+list, KupferDigital attribution and processing details.
+
+See the [license review](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/docs/licensing.md) for dependency and source licenses,
+and the [changelog](https://github.com/17636365690/experiment-to-cpfe-pipeline/blob/v0.1.0/CHANGELOG.md) for the release contents.

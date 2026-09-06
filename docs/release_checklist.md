@@ -1,62 +1,57 @@
 # Public release checklist
 
-This checklist applies to the complete upload candidate, including tracked files,
-non-ignored new files, build contents and reachable Git history. A previous test
-count or scan does not certify later changes. Use the final dated verification
-report to record the source version, commands, outputs and artifact checks.
+Apply this checklist to the release candidate: tracked and non-ignored new
+files, build archives and reachable Git history. Record the version, commands
+and results in a dated verification report.
 
-The first formal release is `v0.1.0`. Its current evidence is recorded in
-[the release verification](verification/2026-09-06-v0.1.0-release.md).
+For `v0.1.0`, see [the release record](verification/2026-09-06-v0.1.0-release.md).
 
-## Technical gates
+## Tests and packaging
 
-- [ ] The final `python -m pytest -q` run passes without requiring Abaqus. Optional
-  installed-wheel and real-Abaqus tests are clearly skipped or explicitly enabled.
+- [ ] `python -m pytest -q` passes in the offline environment. Record any skips.
+  Enable the wheel-installation and real-Abaqus tests for their respective checks.
 - [ ] `python -m build` produces both sdist and wheel, and installing the wheel
   outside the source checkout finds the default policy and ODB extraction script.
 - [ ] The synthetic multimodal validate/build/HDF5/NPZ/inspect flow completes in
   a new run directory. HDF5 round-trip preserves the declared arrays and metadata.
-- [ ] PyG export is tested with the optional dependencies and explicit graph
-  contract, or its skip is reported as an unverified optional capability.
+- [ ] Test PyG export with its optional dependencies and graph contract, or
+  record the missing dependencies and skipped check.
 - [ ] Data-validation failures and incomplete/changed extraction evidence block
   formal export. Valid solver-incomplete experimental samples remain exportable.
-- [ ] Native INCLUDE dependencies are bound, confined, staged and checked through
-  the CLI. Staging alone does not bypass semantic solver readiness.
-- [ ] A small real-solver check, when available and authorized, records separate
-  datacheck, compile/link and analysis evidence, then ODB extraction and export.
-  Missing data/environment produces explicit blocked evidence. Offline fake
-  solver results are never counted as this check.
-- [ ] The final audit findings are either fixed with verified regression coverage
-  or explicitly outside the documented initial-release scope.
+- [ ] Check native INCLUDE dependencies through the CLI, including path
+  confinement, input binding, staging and semantic solver readiness.
+- [ ] For an authorized real-solver check, record datacheck, compile/link,
+  analysis, ODB extraction and export. Record missing inputs or toolchain
+  requirements when blocked. Report test-double results as offline tests.
+- [ ] Resolve audit findings with regression coverage, or document their effect
+  on the release's supported use cases.
 
-## Public-file gates
+## Files and sources
 
 - [ ] Review `git ls-files --cached --others --exclude-standard`, including
   `docs/superpowers/` and new verification documents, before staging files.
-- [ ] Candidates and build archives contain no raw experiments, ODB/CAE files,
-  checkpoints, private material cards, private manifests, credentials or
-  developer-machine installation paths.
-- [ ] Reachable history has been separately reviewed for the same categories.
-  Any historical findings have an explicit disposition; cleaning a current
-  document must not be reported as removing that content from old commits.
-- [ ] Review credential and path pattern hits by filename/category. Do not print
-  suspected secret values in reports. Generic format mentions and synthetic
-  rejection tests are reviewed in context rather than silently excluded.
-- [ ] Public fixtures are small synthetic inputs or have confirmed redistribution
-  terms. Public-source URL/hash manifests do not include the downloaded files.
-- [ ] No UMAT/VUMAT of unconfirmed origin/license is in the upload candidate.
+- [ ] Keep raw experiments, ODB/CAE files, checkpoints, private material cards,
+  run manifests, credentials and machine configuration in local storage.
+  Check that candidates and build archives exclude them and local installation paths.
+- [ ] Review reachable history for the same categories. Record historical
+  findings and their disposition separately from working-tree changes.
+- [ ] Review credential and path matches in context. Reports identify the file,
+  line and category, with sensitive values redacted.
+- [ ] Use small synthetic fixtures or inputs with confirmed redistribution
+  rights. Keep source manifests in the repository and downloaded inputs locally.
+- [ ] Record origin and redistribution rights for every included UMAT/VUMAT.
 - [ ] Documentation distinguishes semantic parsing from native asset registration,
   implemented solver profiles from extension points, and toolchain checks from
   scientific CPFE validation.
 
-## Publication actions
+## Publication
 
-- [ ] Verify the repository's configured author identity; do not invent a name or
-  email if missing.
-- [ ] Verify the existing remote and visibility match the user's already
-  authorized destination. Do not create a duplicate repository or force-push.
+- [ ] Use the repository's configured author identity. Obtain the maintainer's
+  details if configuration is missing.
+- [ ] Verify the configured remote and repository visibility against the
+  authorized destination. Push to that repository using a normal fast-forward update.
 - [ ] Stage only the reviewed candidate, inspect the staged diff, commit and push
-  only after the required technical/public-file gates pass.
+  after the tests and file review pass.
 - [ ] Verify remote CI on the uploaded commit and report the commit and run link.
 - [ ] Include Apache-2.0 `LICENSE`, project `NOTICE`, third-party attribution and
   SPDX package metadata, using the scope recorded in [licensing.md](licensing.md).
@@ -65,6 +60,4 @@ The first formal release is `v0.1.0`. Its current evidence is recorded in
   pass, attaching the verified wheel and sdist and version-specific install links.
 - [ ] Download the published attachments and verify their contents and installation.
 
-The owner authorized license selection and the first GitHub release. Apache-2.0
-applies to project code; the listed public tensile case materials use CC-BY-4.0.
-PyPI publication is a separate follow-up.
+Project code uses Apache-2.0. The listed public tensile materials use CC-BY-4.0.
