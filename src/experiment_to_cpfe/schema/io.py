@@ -15,6 +15,7 @@ def dump_sample_json(sample: SamplePackage, path: Path) -> None:
     arrays = {
         name: {
             "dtype": array.dtype.name,
+            "dtype_descriptor": array.dtype.str,
             "shape": list(array.shape),
             "data": array.tolist(),
         }
@@ -42,8 +43,10 @@ def load_sample_json(path: Path) -> SamplePackage:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     arrays: dict[str, np.ndarray] = {}
     for name, encoded in payload["arrays"].items():
-        array = np.asarray(encoded["data"], dtype=encoded["dtype"])
+        array = np.asarray(encoded["data"], dtype=encoded.get("dtype_descriptor", encoded["dtype"]))
         expected_shape = tuple(encoded["shape"])
+        if array.size == 0 and any(size == 0 for size in expected_shape):
+            array = array.reshape(expected_shape)
         if array.shape != expected_shape:
             raise ValueError(
                 f"array {name!r} shape {array.shape} does not match "

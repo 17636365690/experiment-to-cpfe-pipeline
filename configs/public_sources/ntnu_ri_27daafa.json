@@ -1,0 +1,24 @@
+{
+  "source_url": "https://gitlab.com/ntnu-physmet/project_metplast/crystal_plasticity",
+  "gitlab_project_id": 67946829,
+  "revision": "27daafa01c0e0e916591371342de36e4bbdd6bb5",
+  "license": "MIT",
+  "source_kind": "input",
+  "purpose": "Optional fixed-revision integration fixture, not a measured dataset or a default material model",
+  "files": [
+    {"path": "LICENSE", "sha256": "f3c4a44ab85c7456247af6608d643ef5588f29c6751d6357212f966306f9ae09"},
+    {"path": "Rate_Independent_UMAT/README.md", "sha256": "785c3618a5078cbe984f016b432f4688887b6a8705fb5ba55abc2ea1b5d0baad"},
+    {"path": "Rate_Independent_UMAT/umat_CPRI.for", "sha256": "48e78c2801bbd8c3aa6a6f451a0e71a3b30e0b7388dce99f794938f765108c58"},
+    {"path": "Rate_Independent_UMAT/Example/CPFEM_RVE10_load.inp", "sha256": "d46ce7093d23ac39aefccecc10d965ce8691f09a2b6d1644be8766c8b8ea1074"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/__model.inp", "sha256": "b32b7fcb0eff77a83b329135df060bfa81a56fab0760832a94be9869c1adee47"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_elset_Grains.inp", "sha256": "8a28fc3442c45f239a63629e6742164e336e20f25624d145a1b18a8bf7e4b545"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_eqs.inp", "sha256": "602f24d3babc49e6962ef70b19c81289737df0626523a3aaf6c4aa2155f68c06"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_geom.inp", "sha256": "65c9e1da401a96f337d6a1ab69906a578a51bee761b9f855e84e4d44e0def26b"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_material_RI_Al1050.inp", "sha256": "a7361ad14da1e6d836650c239de5d2a5e711df09dea3c5b70f3fe8682b62607b"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_output.inp", "sha256": "b90a05967774784e39d5d33c33a84f941cbc359a0611e44bce419f11c78caa1b"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_sdvini_Grains_rand.inp", "sha256": "8e1f96540b6f2c0fee75f81889b1faf4d2b5b7eb89afddacb7d0139ed1a99dc3"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_sets.inp", "sha256": "1f326cec1636fe9a65bd71efa25657f2c74d0f8d6057166f5ff07cf51c7f44c5"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_step_initial.inp", "sha256": "663aea9d480c3991e74099262bab23d0598ff3080d15ebe5615e6b7a3c689399"},
+    {"path": "Rate_Independent_UMAT/Input_files/RVE10/_timepoints.inp", "sha256": "5c484f0f475e099f2ea3a78cfbc0546793b9696f3b23e5c54cb90a659a057b51"}
+  ]
+}

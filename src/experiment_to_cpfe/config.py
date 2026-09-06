@@ -76,6 +76,20 @@ class ExternalAssetConfig(BaseModel):
     adapter_config: dict[str, object]
 
 
+class InputBundleConfig(BaseModel):
+    """Native Abaqus input tree with an explicit source root and submission cwd."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_root: Path
+    entrypoint: Path
+    submission_dir: Path
+    auxiliary_files: tuple[Path, ...] = ()
+    license: NonEmptyStr
+    max_files: int = Field(default=4096, ge=1)
+    max_total_bytes: int = Field(default=32 * 1024 * 1024, ge=1)
+
+
 class AbaqusConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -87,6 +101,10 @@ class AbaqusConfig(BaseModel):
     cpus: int = Field(default=1, ge=1)
     timeout_seconds: int = Field(default=3600, ge=1)
     required_fields: tuple[NonEmptyStr, ...] = ("S", "LE", "PEEQ", "SDV")
+    extraction_position: Literal["integration_point", "nodal", "element_nodal", "element_face", "centroid", "native"] = "integration_point"
+    extraction_max_records: int = Field(default=1000000, ge=1)
+    field_units: dict[NonEmptyStr, NonEmptyStr] = Field(default_factory=dict)
+    input_bundle: InputBundleConfig | None = None
 
 
 class ExportConfig(BaseModel):
@@ -111,6 +129,20 @@ def _resolve_optional_path(value: Path | None, base_dir: Path) -> Path | None:
     if value is None or value.is_absolute():
         return value
     return (base_dir / value).resolve()
+
+
+def _resolve_input_bundle(value: InputBundleConfig | None, base_dir: Path) -> InputBundleConfig | None:
+    if value is None:
+        return None
+    root = value.source_root if value.source_root.is_absolute() else (base_dir / value.source_root).resolve()
+    def under_root(path: Path) -> Path:
+        return path if path.is_absolute() else (root / path).absolute()
+    return value.model_copy(update={
+        "source_root": root,
+        "entrypoint": under_root(value.entrypoint),
+        "submission_dir": under_root(value.submission_dir),
+        "auxiliary_files": tuple(under_root(path) for path in value.auxiliary_files),
+    })
 
 
 def load_pipeline_config(path: Path) -> PipelineConfig:
@@ -162,6 +194,7 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
                 config.abaqus.user_subroutine,
                 base_dir,
             ),
+            "input_bundle": _resolve_input_bundle(config.abaqus.input_bundle, base_dir),
         }
     )
     return config.model_copy(

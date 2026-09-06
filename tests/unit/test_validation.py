@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 
 def test_synthetic_sample_passes_validation(make_sample, validation_policy):
@@ -20,6 +21,35 @@ def test_missing_units_is_an_error(make_sample, validation_policy):
 
     assert not report.passed
     assert any(issue.code == "MISSING_UNIT" for issue in report.errors)
+
+
+def test_placeholder_unit_is_a_validation_error(make_sample, validation_policy):
+    from experiment_to_cpfe.schema.validation import validate_sample
+
+    sample = make_sample()
+    sample.metadata.unit_system["stress"] = "unknown"
+    report = validate_sample(sample, validation_policy)
+    assert not report.passed
+    assert any(issue.code == "MISSING_UNIT" for issue in report.errors)
+
+
+def test_multiple_field_locations_in_one_increment_are_not_duplicate_increments(make_sample, validation_policy):
+    from experiment_to_cpfe.schema.validation import validate_sample
+
+    sample=make_sample()
+    sample.tables['simulation_records']=[
+        {'increment_id':'i0','field':'S','component':'S11','element_label':1,'value':3.0},
+        {'increment_id':'i0','field':'S','component':'S11','element_label':2,'value':4.0},
+    ]
+    assert validate_sample(sample,validation_policy).passed
+
+
+def test_duplicate_field_location_component_is_rejected(make_sample, validation_policy):
+    from experiment_to_cpfe.schema.validation import validate_sample
+
+    sample=make_sample()
+    sample.tables['simulation_records']=[{'increment_id':'i0','field':'S','component':'S11','element_label':1,'value':3.0}]*2
+    assert any(i.code=='DUPLICATE_FIELD_RECORD' for i in validate_sample(sample,validation_policy).errors)
 
 
 def test_nonfinite_array_is_an_error(make_sample, validation_policy):
@@ -70,59 +100,54 @@ def test_curve_only_sample_is_not_solver_ready(make_sample):
     assert any("material" in item for item in readiness.missing)
 
 
-def test_complete_solver_contract_is_ready(make_sample):
-    from experiment_to_cpfe.assets.models import (
-        AssetKind,
-        AssetRef,
-        DataLayer,
-        SourceKind,
-    )
-    from experiment_to_cpfe.schema.models import SamplePackage
+@pytest.fixture
+def solver_ready_sample(multimodal_sample_config):
+    from experiment_to_cpfe.adapters.tabular import assemble_sample
+    from experiment_to_cpfe.config import load_pipeline_config
+
+    return assemble_sample(load_pipeline_config(multimodal_sample_config))
+
+
+def test_complete_solver_contract_is_ready(solver_ready_sample):
     from experiment_to_cpfe.schema.validation import check_solver_readiness
 
-    source = make_sample()
-    mesh = AssetRef(
-        asset_id="mesh-input",
-        parent_asset_id=None,
-        modality=AssetKind.MESH,
-        format="inp",
-        uri="synthetic/model.inp",
-        source_kind=SourceKind.INPUT,
-        layer=DataLayer.SOLVER_INPUT,
-        units={"length": "m"},
-        coordinate_frame="sample",
-        axis_order=("node", "coordinate"),
-        dtype="mixed",
-        shape=(8, 3),
-        native_layout="abaqus_keyword_mesh",
-        sha256=None,
-        license="synthetic",
-        lossy_transformations=(),
-    )
-    orientation = source.assets[0].model_copy(
-        update={
-            "asset_id": "orientation-input",
-            "modality": AssetKind.ORIENTATION_MAP,
-            "source_kind": SourceKind.INPUT,
-        }
-    )
-    sample = SamplePackage(
-        metadata=source.metadata,
-        tables=source.tables,
-        arrays=source.arrays,
-        assets=(mesh, orientation),
-        solver_inputs={
-            "microstructure_mapping": {"1": [1]},
-            "material_model": "user_cp_model",
-            "material_parameters": {"elastic_modulus": 1.0},
-            "orientation_required": True,
-            "boundary_conditions": ["fixed-x"],
-            "load_steps": ["tension"],
-            "output_variables": ["S", "LE", "PEEQ", "SDV"],
-        },
-    )
+    assert check_solver_readiness(solver_ready_sample, "abaqus_cpfe").ready
 
-    assert check_solver_readiness(sample, "abaqus_cpfe").ready
+
+@pytest.mark.parametrize("units", [
+    {}, {"length": "m", "time": "s"},
+    {"length": "m", "stress": "unknown", "time": "s"},
+    {"length": "m", "stress": "Pa", "time": "TBD"},
+    {"length": "native units", "stress": "Pa", "time": "s"},
+])
+def test_readiness_rejects_missing_or_unresolved_units(solver_ready_sample, units):
+    from experiment_to_cpfe.schema.validation import check_solver_readiness
+
+    solver_ready_sample.metadata.unit_system = units
+    report = check_solver_readiness(solver_ready_sample, "abaqus_cpfe")
+    assert not report.ready
+    assert any("unit" in item.lower() for item in report.missing)
+
+
+def test_readiness_rejects_coordinate_length_unit_disagreement(solver_ready_sample):
+    from experiment_to_cpfe.schema.validation import check_solver_readiness
+
+    solver_ready_sample.metadata.coordinate = solver_ready_sample.metadata.coordinate.model_copy(update={"units": "mm"})
+    report = check_solver_readiness(solver_ready_sample, "abaqus_cpfe")
+    assert not report.ready
+    assert any("coordinate" in item.lower() for item in report.missing)
+
+
+def test_missing_units_block_inp_even_with_replacements(solver_ready_sample, tmp_path):
+    from experiment_to_cpfe.solvers.abaqus.inp import build_solver_input
+
+    template = tmp_path / "template.inp"
+    template.write_text('*Heading\n{{HEADING}}\n')
+    solver_ready_sample.solver_inputs["inp_replacements"] = {"HEADING": "synthetic"}
+    solver_ready_sample.metadata.unit_system = {}
+    with pytest.raises(ValueError, match="unit"):
+        build_solver_input(solver_ready_sample, template, tmp_path / "model.inp")
+    assert not (tmp_path / "model.inp").exists()
 
 
 def test_measured_curve_is_registered_as_calibration_target(make_sample):

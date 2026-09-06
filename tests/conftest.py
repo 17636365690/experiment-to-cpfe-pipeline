@@ -139,10 +139,10 @@ def multimodal_sample_config(tmp_path):
     replacements = {
         "HEADING": "Synthetic multimodal model",
         "NODES": "*NODE\n1,0,0,0\n2,1,0,0\n3,1,1,0\n4,0,1,0\n5,0,0,1\n6,1,0,1\n7,1,1,1\n8,0,1,1",
-        "ELEMENTS": "*ELEMENT, TYPE=C3D8\n1,1,2,3,4,5,6,7,8",
-        "MATERIALS": "*MATERIAL, NAME=SYNTHETIC\n*ELASTIC\n1.0,0.3",
-        "BOUNDARY_CONDITIONS": "*BOUNDARY\n1,1,3,0",
-        "OUTPUT_REQUESTS": "*STEP\n*STATIC\n0.1,1\n*OUTPUT, FIELD\n*ELEMENT OUTPUT\nS,LE,PEEQ,SDV\n*END STEP",
+        "ELEMENTS": "*ELEMENT, TYPE=C3D8, ELSET=ALL\n1,1,2,3,4,5,6,7,8",
+        "MATERIALS": "*MATERIAL, NAME=SYNTHETIC\n*ELASTIC\n1.0,0.3\n*SOLID SECTION, ELSET=ALL, MATERIAL=SYNTHETIC",
+        "BOUNDARY_CONDITIONS": "*BOUNDARY\n1,1,3,0\n2,2,3,0\n4,3,3,0",
+        "OUTPUT_REQUESTS": "*STEP, NAME=SMOKE\n*STATIC\n0.1,1\n*BOUNDARY\n5,3,3,0.001\n6,3,3,0.001\n7,3,3,0.001\n8,3,3,0.001\n*OUTPUT, FIELD\n*ELEMENT OUTPUT\nS,LE\n*END STEP",
     }
     payload = {
         "sample": {
@@ -206,10 +206,16 @@ def multimodal_sample_config(tmp_path):
             },
         ],
         "solver_inputs": {
-            "microstructure_mapping": {"1": [1]}, "material_model": "synthetic_elastic_cp",
-            "material_parameters": {"E": 1.0, "nu": 0.3}, "orientation_required": True,
-            "boundary_conditions": ["fixed"], "load_steps": ["tension"],
-            "output_variables": ["S", "LE", "PEEQ", "SDV"], "inp_replacements": replacements,
+            "microstructure_mapping": {"1": [1]}, "material_model": "isotropic_elastic",
+            "material_parameters": {"E": 1.0, "nu": 0.3}, "orientation_required": False,
+            "boundary_conditions": [
+                {"target": "1", "first_dof": 1, "last_dof": 3, "value": 0.0},
+                {"target": "2", "first_dof": 2, "last_dof": 3, "value": 0.0},
+                {"target": "4", "first_dof": 3, "last_dof": 3, "value": 0.0},
+                *[{"target": str(node), "first_dof": 3, "last_dof": 3, "value": 0.001} for node in (5, 6, 7, 8)],
+            ],
+            "load_steps": [{"name": "SMOKE", "procedure": "static", "initial_increment": 0.1, "time_period": 1.0}],
+            "output_variables": ["S", "LE"], "inp_replacements": replacements,
         },
         "abaqus": {"command": ["abaqus"], "job_name": "synthetic", "template_path": "template.inp"},
         "export": {"formats": ["hdf5", "npz"]},

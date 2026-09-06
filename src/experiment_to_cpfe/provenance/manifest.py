@@ -39,7 +39,7 @@ def build_run_manifest(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "run_dir": str(Path(run_dir)),
         "config_path": str(Path(config_path)),
-        "config_sha256": sha256_file(config_path),
+        "config_sha256": sha256_file(config_path) if Path(config_path).is_file() else None,
         "stages": stage_records,
         "artifacts": artifacts,
         "limitations": [

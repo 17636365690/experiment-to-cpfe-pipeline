@@ -55,10 +55,12 @@ def test_hdf5_rejects_existing_output(tmp_path, make_sample):
 
 def test_npz_records_hdf5_source_hash(tmp_path, make_sample):
     from experiment_to_cpfe.datasets.package import write_npz
+    from experiment_to_cpfe.datasets.hdf5 import write_hdf5
 
     output = tmp_path / "sample.npz"
-    source_hash = "b" * 64
-    write_npz(make_sample(), output, source_hash)
+    source=tmp_path/'source.h5'
+    source_hash = write_hdf5(make_sample(),source)
+    write_npz(source, output, source_hash)
 
     with np.load(output, allow_pickle=False) as bundle:
         assert bundle["demo"].tolist() == [1.0, 2.0]

@@ -1,7 +1,7 @@
 """Modality-neutral asset metadata models."""
 
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
@@ -45,6 +45,27 @@ class SourceKind(str, Enum):
     SIMULATED = "simulated"
 
 
+class ConversionRecord(BaseModel):
+    """Content-level provenance for a derived asset, without inferred license."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    original_format: NonEmptyStr
+    target_format: NonEmptyStr
+    source_sha256: str = Field(pattern=r"^[0-9a-fA-F]{64}$")
+    target_file_hashes: dict[NonEmptyStr, Annotated[str, StringConstraints(pattern=r"^[0-9a-fA-F]{64}$")]] = Field(default_factory=dict)
+    hash_scope: Literal["files", "logical_payload"] = "files"
+    target_payload_sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
+    source_hash_verified: bool = Field(default=False, description="Local file hash agreement only, not solver authentication")
+
+    @model_validator(mode="after")
+    def require_target_digest(self) -> "ConversionRecord":
+        if self.hash_scope == "files" and (not self.target_file_hashes or self.target_payload_sha256 is not None):
+            raise ValueError("file conversion requires target_file_hashes without a logical payload digest")
+        if self.hash_scope == "logical_payload" and (self.target_payload_sha256 is None or self.target_file_hashes):
+            raise ValueError("logical payload conversion requires only target_payload_sha256")
+        return self
+
+
 class AssetRef(BaseModel):
     """Immutable reference to one native or derived data asset."""
 
@@ -66,6 +87,8 @@ class AssetRef(BaseModel):
     sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
     license: NonEmptyStr | None
     lossy_transformations: tuple[NonEmptyStr, ...]
+    conversion: ConversionRecord | None = None
+    descriptive_metadata: dict[str, object] = Field(default_factory=dict)
 
 
 class AssetManifest(BaseModel):
@@ -82,6 +105,7 @@ class AssetManifest(BaseModel):
             raise ValueError("duplicate asset_id in asset manifest")
 
         known_ids = set(asset_ids)
+        by_id = {asset.asset_id: asset for asset in self.assets}
         for asset in self.assets:
             if (
                 asset.parent_asset_id is not None
@@ -90,6 +114,26 @@ class AssetManifest(BaseModel):
                 raise ValueError(
                     f"parent_asset_id {asset.parent_asset_id!r} is not in manifest"
                 )
+            if asset.conversion is not None:
+                parent = by_id.get(asset.parent_asset_id)
+                if parent is None:
+                    raise ValueError("conversion requires a parent asset")
+                if parent.sha256 is None or parent.sha256.lower() != asset.conversion.source_sha256.lower():
+                    raise ValueError("conversion source hash differs from parent asset")
+                if parent.format != asset.conversion.original_format or asset.format != asset.conversion.target_format:
+                    raise ValueError("conversion formats differ from asset formats")
+                if asset.conversion.hash_scope == "logical_payload" and asset.sha256 != asset.conversion.target_payload_sha256:
+                    raise ValueError("logical payload hash differs from converted asset hash")
+        finished: set[str] = set()
+        for asset_id in asset_ids:
+            visiting: set[str] = set()
+            current: str | None = asset_id
+            while current is not None and current not in finished:
+                if current in visiting:
+                    raise ValueError("parent_asset_id cycle in asset manifest")
+                visiting.add(current)
+                current = by_id[current].parent_asset_id
+            finished.update(visiting)
         return self
 
     def get(self, asset_id: str) -> AssetRef:

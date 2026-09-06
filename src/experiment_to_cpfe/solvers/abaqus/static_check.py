@@ -87,4 +87,10 @@ def static_check_inp(path: Path) -> StaticCheckReport:
         errors.append("missing analysis step")
     if counts["outputs"] == 0:
         warnings.append("no explicit output request")
-    return StaticCheckReport(tuple(errors), tuple(warnings), counts)
+    from experiment_to_cpfe.schema.solver_contract import inspect_mesh, parse_keyword_blocks
+    try:
+        blocks = parse_keyword_blocks("\n".join(lines))
+        errors.extend(inspect_mesh(blocks)[-1])
+    except ValueError as exc:
+        errors.append(str(exc))
+    return StaticCheckReport(tuple(dict.fromkeys(errors)), tuple(warnings), counts)

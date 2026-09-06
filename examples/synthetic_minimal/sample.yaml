@@ -21,7 +21,7 @@ sample:
 sources:
   - path: experiment.csv
     table_name: measured_observations
-    source_kind: measured
+    source_kind: input
     modality: time_series
     format: csv
     delimiter: ","
@@ -42,7 +42,7 @@ sources:
     license: synthetic
   - path: grains.csv
     table_name: grains
-    source_kind: measured
+    source_kind: input
     modality: orientation_map
     format: csv
     delimiter: ","
@@ -69,7 +69,7 @@ assets:
   - asset_id: dic-points
     path: dic.csv
     parent_asset_id: null
-    source_kind: measured
+    source_kind: input
     layer: raw
     modality: point_field
     format: csv
@@ -90,7 +90,7 @@ assets:
   - asset_id: ct-voxels
     path: voxel.json
     parent_asset_id: null
-    source_kind: measured
+    source_kind: input
     layer: raw
     modality: voxel_grid
     format: json
@@ -139,13 +139,21 @@ assets:
 solver_inputs:
   microstructure_mapping:
     "1": [1]
-    "2": [1]
-  material_model: synthetic_elastic_cp_placeholder
-  material_parameters: {elastic_modulus: 1.0, poisson_ratio: 0.3}
-  orientation_required: true
-  boundary_conditions: [fixed-origin]
-  load_steps: [uniaxial-z]
-  output_variables: [S, LE, PEEQ, SDV]
+  material_model: isotropic_elastic
+  material_parameters: {E: 1.0, nu: 0.3}
+  orientation_required: false
+  boundary_conditions:
+    - {target: '1', first_dof: 1, last_dof: 3, value: 0.0}
+    - {target: '2', first_dof: 2, last_dof: 3, value: 0.0}
+    - {target: '3', first_dof: 3, last_dof: 3, value: 0.0}
+    - {target: '4', first_dof: 3, last_dof: 3, value: 0.0}
+    - {target: '5', first_dof: 3, last_dof: 3, value: 0.001}
+    - {target: '6', first_dof: 3, last_dof: 3, value: 0.001}
+    - {target: '7', first_dof: 3, last_dof: 3, value: 0.001}
+    - {target: '8', first_dof: 3, last_dof: 3, value: 0.001}
+  load_steps:
+    - {name: SMOKE, procedure: static, initial_increment: 0.1, time_period: 1.0}
+  output_variables: [S, E, U, RF]
   inp_replacements:
     HEADING: Synthetic multimodal smoke model
     NODES: |-
@@ -169,17 +177,30 @@ solver_inputs:
     BOUNDARY_CONDITIONS: |-
       *BOUNDARY
       1, 1, 3, 0.0
+      2, 2, 3, 0.0
+      3, 3, 3, 0.0
+      4, 3, 3, 0.0
     OUTPUT_REQUESTS: |-
       *STEP, NAME=SMOKE
       *STATIC
       0.1, 1.0
+      *BOUNDARY
+      5, 3, 3, 0.001
+      6, 3, 3, 0.001
+      7, 3, 3, 0.001
+      8, 3, 3, 0.001
       *OUTPUT, FIELD
       *ELEMENT OUTPUT
-      S, LE, PEEQ, SDV
+      S, E
+      *NODE OUTPUT
+      U, RF
       *END STEP
 abaqus:
   command: [abaqus]
   job_name: synthetic
   template_path: ../../configs/templates/cpfe_template.inp
+  required_fields: [S, E, U, RF]
+  field_units: {S: Pa, E: '1', U: m, RF: N}
+  extraction_position: native
 export:
   formats: [hdf5, npz]

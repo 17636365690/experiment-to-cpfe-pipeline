@@ -26,9 +26,15 @@ def load_point_field(
     coordinate_frame = str(_required(config, "coordinate_frame"))
     axis_order = tuple(_required(config, "axis_order"))
     columns = coordinate_columns + field_columns
+    if len(set(columns)) != len(columns):
+        raise ValueError("coordinate and field columns must be unique and disjoint")
+    if len(axis_order) != 2 or len(set(axis_order)) != 2:
+        raise ValueError("point-field axis_order must describe two unique array axes")
     missing_units = sorted(set(columns) - set(units))
     if missing_units:
         raise ValueError(f"units are missing for columns: {missing_units}")
+    if any(not str(units[column]).strip() for column in columns):
+        raise ValueError("point-field units must be nonempty")
 
     if format_name not in {"csv", "txt"}:
         raise ValueError(f"unsupported point-field format: {format_name}")
@@ -38,6 +44,8 @@ def load_point_field(
     if missing_columns:
         raise ValueError(f"point-field columns are missing: {missing_columns}")
     values = frame.loc[:, list(columns)].to_numpy(dtype=float)
+    if not values.size or not np.isfinite(values).all():
+        raise ValueError("point-field values must be nonempty and finite")
     metadata = {
         "columns": columns,
         "units": units,

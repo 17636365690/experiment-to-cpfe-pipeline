@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 import math
 from pathlib import Path
+from numbers import Real
 from typing import Literal
 
 import numpy as np
@@ -11,10 +12,16 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field
 
 from experiment_to_cpfe.assets.models import AssetKind, AssetManifest
+from experiment_to_cpfe._resources.field_contract import record_identity
 from experiment_to_cpfe.schema.models import SamplePackage
 
 
 Severity = Literal["error", "warning", "info"]
+
+
+def _unit_is_declared(value: object) -> bool:
+    unresolved = {"", "unknown", "unspecified", "native", "native units", "tbd", "?", "none", "null", "n/a"}
+    return isinstance(value, str) and value.strip().lower() not in unresolved
 
 
 @dataclass(frozen=True)
@@ -110,11 +117,6 @@ def validate_asset_links(
         if (
             asset.coordinate_frame
             and asset.coordinate_frame != sample_frame
-            and not any(
-                "coordinate" in transformation.lower()
-                or "registration" in transformation.lower()
-                for transformation in asset.lossy_transformations
-            )
         ):
             issues.append(
                 _issue(
@@ -142,6 +144,45 @@ def validate_sample(
             )
         )
 
+    for quantity, unit in sample.metadata.unit_system.items():
+        if not _unit_is_declared(unit):
+            issues.append(_issue(
+                "MISSING_UNIT", f"unit for {quantity} is unresolved",
+                f"metadata.unit_system.{quantity}", policy.missing_units_severity,
+            ))
+
+    assets_by_id = {asset.asset_id: asset for asset in sample.assets}
+    bound_tables = {asset.descriptive_metadata.get("table_name") for asset in sample.assets
+                    if isinstance(asset.descriptive_metadata.get("table_name"), str)}
+    for table_name, rows in sample.tables.items():
+        for index, row in enumerate(rows):
+            location = f"tables.{table_name}[{index}]"
+            if table_name not in bound_tables and "source_asset_id" not in row and "source_kind" not in row:
+                continue
+            source_id = row.get("source_asset_id")
+            source = assets_by_id.get(source_id) if isinstance(source_id, str) else None
+            if source is None:
+                issues.append(_issue("INVALID_ROW_SOURCE", "row source_asset_id is missing or unregistered", location))
+                continue
+            if row.get("source_kind") != source.source_kind.value:
+                issues.append(_issue("CONTRADICTORY_EVIDENCE", "row source_kind differs from its source asset", location))
+            if table_name == "simulation_records" and source.source_kind.value != "simulated":
+                issues.append(_issue("CONTRADICTORY_EVIDENCE", "simulation_records requires simulated source evidence", location))
+            if table_name == "measured_observations" and source.source_kind.value == "simulated":
+                issues.append(_issue("CONTRADICTORY_EVIDENCE", "simulated evidence cannot enter measured_observations", location))
+            if source.descriptive_metadata.get("table_name") != table_name:
+                issues.append(_issue("INVALID_ROW_SOURCE", "row table differs from its source table declaration", location))
+            columns = source.descriptive_metadata.get("column_map")
+            if not isinstance(columns, dict) or not columns:
+                issues.append(_issue("INVALID_ROW_SOURCE", "bound tabular source requires an explicit column mapping", location))
+                continue
+            for column in columns:
+                if column not in row:
+                    issues.append(_issue("MISSING_COLUMN", f"mapped column {column!r} is missing", location))
+                if not _unit_is_declared(source.units.get(column)):
+                    issues.append(_issue("MISSING_UNIT", f"source unit for mapped column {column!r} is unresolved", location,
+                                         policy.missing_units_severity))
+
     if policy.require_finite:
         for name, array in sample.arrays.items():
             if np.issubdtype(array.dtype, np.number) and not np.isfinite(array).all():
@@ -152,6 +193,14 @@ def validate_sample(
                         f"arrays.{name}",
                     )
                 )
+        for table_name, rows in sample.tables.items():
+            for index, row in enumerate(rows):
+                for column, value in row.items():
+                    if isinstance(value, Real) and not math.isfinite(value):
+                        issues.append(_issue(
+                            "NONFINITE_VALUE", "table contains NaN or infinity",
+                            f"tables.{table_name}[{index}].{column}",
+                        ))
 
     grains = sample.tables.get("grains", [])
     grain_ids = {row.get("grain_id") for row in grains if "grain_id" in row}
@@ -172,8 +221,11 @@ def validate_sample(
     for index, row in enumerate(grains):
         quaternion_keys = ("q0", "q1", "q2", "q3")
         if all(key in row for key in quaternion_keys):
-            norm = math.sqrt(sum(float(row[key]) ** 2 for key in quaternion_keys))
-            if abs(norm - 1.0) > policy.quaternion_tolerance:
+            try:
+                norm = math.hypot(*(float(row[key]) for key in quaternion_keys))
+            except (ValueError, TypeError):
+                norm = math.nan
+            if not math.isfinite(norm) or abs(norm - 1.0) > policy.quaternion_tolerance:
                 issues.append(
                     _issue(
                         "INVALID_QUATERNION",
@@ -184,7 +236,25 @@ def validate_sample(
 
     for table_name in ("load_history", "measured_observations", "simulation_records"):
         rows = sample.tables.get(table_name, [])
-        increments = [row.get("increment_id") for row in rows if "increment_id" in row]
+        clocks: dict[tuple[object, ...], float] = {}
+        for index, row in enumerate(rows):
+            time = row.get("time")
+            if time is not None:
+                if not isinstance(time, Real) or isinstance(time, bool) or not math.isfinite(time):
+                    issues.append(_issue("INVALID_TIME", "time must be finite numeric data", f"tables.{table_name}[{index}].time"))
+                    continue
+                clock_key = tuple(row.get(key) for key in ("step", "load_case", "load_path_id", "asset_id", "source_asset_id"))
+                previous = clocks.get(clock_key)
+                if previous is not None and time < previous:
+                    issues.append(_issue("NONMONOTONIC_TIME", "time decreases within a step/load path", f"tables.{table_name}[{index}].time"))
+                clocks[clock_key] = float(time)
+        if table_name == "simulation_records":
+            field_rows = [row for row in rows if "field" in row]
+            locations = [(row.get("source_asset_id"), record_identity(row)) for row in field_rows]
+            if len(locations) != len(set(locations)):
+                issues.append(_issue("DUPLICATE_FIELD_RECORD", "duplicate field location/component", "tables.simulation_records"))
+            rows = [row for row in rows if "field" not in row]
+        increments = [(row.get("source_asset_id"), row.get("step"), row.get("load_case"), row.get("increment_id")) for row in rows if "increment_id" in row]
         if len(increments) != len(set(increments)):
             issues.append(
                 _issue(
@@ -207,9 +277,46 @@ def check_solver_readiness(
             ready=False,
         )
 
+    replacements = sample.solver_inputs.get("inp_replacements")
+    order = ("HEADING", "NODES", "ELEMENTS", "MATERIALS", "BOUNDARY_CONDITIONS", "OUTPUT_REQUESTS")
+    if isinstance(replacements, dict) and all(isinstance(value, str) for value in replacements.values()):
+        deck_text = "*HEADING\n" + "\n".join(replacements.get(key, "") for key in order)
+    else:
+        deck_text = ""
+    return check_deck_readiness(sample, deck_text)
+
+
+def check_deck_readiness(sample: SamplePackage, deck_text: str) -> SolverReadinessReport:
+    """Check normalized declarations against an expanded, actual input deck.
+
+    Native bundle callers resolve and hash includes before supplying the text.
+    Staging a native bundle never implies this semantic gate has passed.
+    """
+    from experiment_to_cpfe.schema.solver_contract import solver_contract_errors
+
     modalities = {asset.modality for asset in sample.assets}
     inputs = sample.solver_inputs
     missing: list[str] = []
+    units = sample.metadata.unit_system
+    for quantity in ("length", "stress", "time"):
+        value = units.get(quantity)
+        if not _unit_is_declared(value):
+            missing.append(f"explicit unit_system.{quantity} unit")
+    supported_units = {
+        "length": {"m", "cm", "mm", "um", "µm", "nm"},
+        "stress": {"Pa", "kPa", "MPa", "GPa"},
+        "time": {"s", "ms", "us", "min", "h"},
+    }
+    for quantity, symbols in supported_units.items():
+        if units.get(quantity) not in symbols:
+            missing.append(f"supported explicit {quantity} unit required for v1 adapter")
+    if sample.metadata.tensor_order != ("11", "22", "33", "12", "13", "23"):
+        missing.append("explicit Abaqus tensor mapping required for tensor_order")
+    if sample.metadata.coordinate.axes != ("x", "y", "z"):
+        missing.append("v1 flat solid adapter requires explicit x,y,z coordinate axes")
+    length_unit = units.get("length")
+    if length_unit and sample.metadata.coordinate.units != length_unit:
+        missing.append("coordinate.units must match declared unit_system.length; normalize explicitly")
     if AssetKind.MESH not in modalities:
         missing.append("geometry/mesh asset")
     if not inputs.get("microstructure_mapping"):
@@ -228,6 +335,8 @@ def check_solver_readiness(
         missing.append("loading definition")
     if not inputs.get("output_variables"):
         missing.append("output-variable contract")
+    missing.extend(issue.message for issue in validate_sample(sample, ValidationPolicy()).errors)
+    missing.extend(solver_contract_errors(sample, deck_text))
     missing_tuple = tuple(f"MISSING_SOLVER_INPUT: {item}" for item in missing)
     return SolverReadinessReport(
         missing=missing_tuple,

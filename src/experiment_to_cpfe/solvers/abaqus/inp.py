@@ -6,7 +6,7 @@ import re
 
 from experiment_to_cpfe.provenance.hashing import sha256_file
 from experiment_to_cpfe.schema.models import SamplePackage
-from experiment_to_cpfe.schema.validation import check_solver_readiness
+from experiment_to_cpfe.schema.validation import check_deck_readiness, check_solver_readiness
 
 
 KNOWN_MARKERS = frozenset(
@@ -40,7 +40,20 @@ def build_inp(request: SolverInputRequest) -> InpBuildResult:
     output_path = Path(request.output_path)
     if output_path.exists():
         raise FileExistsError(output_path)
-    template = Path(request.template_path).read_text(encoding="utf-8")
+    rendered, markers = render_inp(request.template_path, request.replacements)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(rendered)
+    return InpBuildResult(
+        output_path=output_path,
+        sha256=sha256_file(output_path),
+        replacements=tuple(sorted(markers)),
+    )
+
+
+def render_inp(template_path: Path, replacements: dict[str, str]) -> tuple[str, set[str]]:
+    """Render in memory so semantic failures cannot leave a runnable output."""
+    template = Path(template_path).read_text(encoding="utf-8")
     if "\x00" in template:
         raise ValueError("INP template contains a null byte")
 
@@ -48,26 +61,20 @@ def build_inp(request: SolverInputRequest) -> InpBuildResult:
     unknown = markers - KNOWN_MARKERS
     if unknown:
         raise ValueError(f"unknown INP template markers: {sorted(unknown)}")
-    missing = markers - set(request.replacements)
+    missing = markers - set(replacements)
     if missing:
         raise ValueError(f"missing INP replacements: {sorted(missing)}")
 
     rendered = template
     for marker in markers:
-        value = request.replacements[marker]
+        value = replacements[marker]
         if not value or "\x00" in value:
             raise ValueError(f"replacement {marker} is empty or invalid")
         rendered = rendered.replace(f"{{{{{marker}}}}}", value)
     if MARKER_PATTERN.search(rendered):
         raise ValueError("unresolved INP template marker")
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(rendered, encoding="utf-8", newline="\n")
-    return InpBuildResult(
-        output_path=output_path,
-        sha256=sha256_file(output_path),
-        replacements=tuple(sorted(markers)),
-    )
+    return rendered, markers
 
 
 def build_solver_input(
@@ -81,10 +88,14 @@ def build_solver_input(
     replacements = sample.solver_inputs.get("inp_replacements")
     if not isinstance(replacements, dict):
         raise ValueError("MISSING_SOLVER_INPUT: inp_replacements")
-    return build_inp(
-        SolverInputRequest(
-            template_path=Path(template_path),
-            output_path=Path(output_path),
-            replacements={str(key): str(value) for key, value in replacements.items()},
-        )
-    )
+    if not all(isinstance(value, str) for value in replacements.values()):
+        raise ValueError("INP replacements must be strings")
+    rendered, markers = render_inp(template_path, replacements)
+    readiness = check_deck_readiness(sample, rendered)
+    if not readiness.ready:
+        raise ValueError("; ".join(readiness.missing))
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("x", encoding="utf-8", newline="\n") as handle:
+        handle.write(rendered)
+    return InpBuildResult(output_path, sha256_file(output_path), tuple(sorted(markers)))

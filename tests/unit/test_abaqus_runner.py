@@ -1,4 +1,6 @@
 import sys
+import os
+import pytest
 from pathlib import Path
 
 
@@ -102,3 +104,102 @@ def test_user_subroutine_records_compile_and_link_success(tmp_path, monkeypatch)
 
     assert result.status == "completed"
     assert result.compile_link_status == "completed"
+    assert result.compile_status == "completed"
+    assert result.link_status == "completed"
+
+
+def test_link_failure_preserves_successful_compile_evidence(tmp_path, monkeypatch):
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+
+    user = tmp_path / "umat.for"
+    user.write_text("C synthetic fixture\n", encoding="ascii")
+    monkeypatch.setenv("FAKE_SOLVER_LINK_FAILURE", "1")
+    result = run_abaqus(request(tmp_path, user_subroutine=user))
+
+    assert result.status == "failed"
+    assert result.compile_status == "completed"
+    assert result.link_status == "failed"
+    assert result.compile_link_status == "failed"
+
+
+def test_compile_end_marker_does_not_override_compiler_error(tmp_path, monkeypatch):
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+
+    user = tmp_path / "umat.for"
+    user.write_text("C synthetic fixture\n", encoding="ascii")
+    monkeypatch.setenv("FAKE_SOLVER_COMPILE_FAILURE", "1")
+    result = run_abaqus(request(tmp_path, user_subroutine=user))
+
+    assert result.status == "failed"
+    assert result.compile_status == "failed"
+    assert result.link_status == "missing_evidence"
+
+
+def test_timeout_retains_partial_binary_output(tmp_path, monkeypatch):
+    import subprocess
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+
+    def timeout(*args, **kwargs):
+        raise subprocess.TimeoutExpired(args[0], 10, output=b"compiler started\xff", stderr=b"partial error")
+
+    monkeypatch.setattr("experiment_to_cpfe.solvers.abaqus.runner._execute_process", timeout)
+    result = run_abaqus(request(tmp_path))
+
+    assert result.status == "failed"
+    assert result.stdout_path.read_text(encoding="utf-8").startswith("compiler started")
+    assert result.stderr_path.read_text(encoding="utf-8") == "partial error"
+
+
+def test_datacheck_error_files_cannot_count_as_success(tmp_path, monkeypatch):
+    import subprocess
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+    req = request(tmp_path, stage="datacheck")
+    def execute(command, **kwargs):
+        (req.work_dir/'synthetic.dat').write_text('***ERROR: MISSING MATERIAL\nDATACHECK COMPLETE')
+        (req.work_dir/'synthetic.msg').write_text('ERROR IN INPUT FILE')
+        return subprocess.CompletedProcess(command,0,'','')
+    monkeypatch.setattr('experiment_to_cpfe.solvers.abaqus.runner._execute_process',execute)
+    assert run_abaqus(req).status == 'failed'
+
+
+def test_datacheck_needs_positive_completion_marker(tmp_path, monkeypatch):
+    import subprocess
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+    req = request(tmp_path, stage="datacheck")
+    def execute(command, **kwargs):
+        (req.work_dir/'synthetic.dat').write_text('processing started')
+        (req.work_dir/'synthetic.msg').write_text('no final state')
+        return subprocess.CompletedProcess(command,0,'','')
+    monkeypatch.setattr('experiment_to_cpfe.solvers.abaqus.runner._execute_process',execute)
+    assert run_abaqus(req).status == 'failed'
+
+
+def test_license_failure_is_blocked(tmp_path, monkeypatch):
+    import subprocess
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+    monkeypatch.setattr('experiment_to_cpfe.solvers.abaqus.runner._execute_process', lambda cmd, **kwargs: subprocess.CompletedProcess(cmd,1,'','License checkout failed'))
+    assert run_abaqus(request(tmp_path)).status == 'blocked'
+
+
+@pytest.mark.skipif(os.name != 'nt', reason='Windows subprocess family regression')
+def test_timeout_stops_owned_child_process(tmp_path):
+    import subprocess
+    import csv
+    from dataclasses import replace
+    from experiment_to_cpfe.solvers.abaqus.runner import run_abaqus
+    import time
+    code="import subprocess,sys,time; p=subprocess.Popen([sys.executable,'-c','import time;time.sleep(6)']); print(p.pid,flush=True); time.sleep(6)"
+    req=replace(request(tmp_path,command=(sys.executable,'-c',code)),timeout_seconds=1)
+    started=time.monotonic()
+    result=run_abaqus(req)
+    elapsed=time.monotonic()-started
+    pid=int(result.stdout_path.read_text().splitlines()[0])
+    probe=subprocess.run(['tasklist','/FI',f'PID eq {pid}','/FO','CSV','/NH'],capture_output=True,text=True)
+    alive=any(len(row)>1 and row[1]==str(pid) for row in csv.reader(probe.stdout.splitlines()))
+    try:
+        assert result.status=='failed'
+        assert not alive, 'timeout left the owned child process running'
+        assert elapsed < 4, 'timeout waited for the un-terminated child to exit naturally'
+    finally:
+        if alive:
+            subprocess.run(['taskkill','/PID',str(pid),'/T','/F'],capture_output=True,check=False)

@@ -23,11 +23,11 @@ def test_assemble_sample_preserves_tables_and_evidence():
     sample = assemble_sample(config)
 
     assert set(sample.tables) == {"measured_observations", "grains"}
-    assert sample.metadata.sources[0].kind is SourceKind.MEASURED
+    assert sample.metadata.sources[0].kind is SourceKind.INPUT
     tabular_assets = [
         asset for asset in sample.assets if asset.asset_id.startswith("asset-source-")
     ]
-    assert {asset.source_kind for asset in tabular_assets} == {SourceKind.MEASURED}
+    assert {asset.source_kind for asset in tabular_assets} == {SourceKind.INPUT}
     assert any(asset.source_kind is SourceKind.INPUT for asset in sample.assets)
 
 

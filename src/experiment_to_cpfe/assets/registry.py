@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +29,34 @@ class AssetInspection:
     native_layout: str
     lossy_transformations: tuple[str, ...]
     warnings: tuple[str, ...]
+
+
+def array_payload_sha256(array: np.ndarray) -> str:
+    """Hash a logical plain NumPy array, not an NPY or HDF5 file.
+
+    Encoding v1: ``numpy-array-v1`` + NUL + compact sorted JSON of dtype.str
+    and shape + NUL + C-order bytes. Array memory strides are not semantic.
+    """
+    if array.dtype.hasobject or array.dtype.fields is not None:
+        raise ValueError("logical array hashes require a plain, non-object dtype")
+    descriptor = json.dumps({"dtype": array.dtype.str, "shape": list(array.shape)},
+                            sort_keys=True, separators=(",", ":")).encode("utf-8")
+    digest = hashlib.sha256(b"numpy-array-v1\0" + descriptor + b"\0")
+    digest.update(array.tobytes(order="C"))
+    return digest.hexdigest()
+
+
+def table_payload_sha256(rows: list[dict[str, object]]) -> str:
+    """Hash normalized logical table rows, independently of a container file.
+
+    Encoding v1 is UTF-8 ``normalized-table-json-v1`` + NUL + JSON rows with
+    sorted object keys, compact separators, literal Unicode and no NaN/Infinity.
+    Row order and explicit source bindings are semantic and remain in the hash.
+    """
+    if not isinstance(rows, list) or not all(isinstance(row, dict) and all(isinstance(key, str) for key in row) for row in rows):
+        raise ValueError("logical table hashes require JSON records with string keys")
+    payload = json.dumps(rows, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False).encode("utf-8")
+    return hashlib.sha256(b"normalized-table-json-v1\0" + payload).hexdigest()
 
 
 def _sha256(path: Path) -> str:

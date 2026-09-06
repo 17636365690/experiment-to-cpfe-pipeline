@@ -15,8 +15,20 @@ def argument(prefix: str, default: str) -> str:
 job = argument("job=", "job")
 is_datacheck = "datacheck" in sys.argv[1:]
 if os.environ.get("FAKE_SOLVER_COMPILE_SUCCESS") == "1":
-    print("FORTRAN COMPILE SUCCESS")
-    print("FORTRAN LINK SUCCESS")
+    print("Begin Compiling Abaqus/Standard User Subroutines")
+    print("End Compiling Abaqus/Standard User Subroutines")
+    print("Begin Linking Abaqus/Standard User Subroutines")
+    print("End Linking Abaqus/Standard User Subroutines")
+if os.environ.get("FAKE_SOLVER_LINK_FAILURE") == "1":
+    print("Begin Compiling Abaqus/Standard User Subroutines")
+    print("End Compiling Abaqus/Standard User Subroutines")
+    print("Begin Linking Abaqus/Standard User Subroutines")
+    print("fatal error LNK1120: 1 unresolved externals")
+if os.environ.get("FAKE_SOLVER_COMPILE_FAILURE") == "1":
+    print("Begin Compiling Abaqus/Standard User Subroutines")
+    print("umat.for(1): error #5082: Syntax error")
+    print("End Compiling Abaqus/Standard User Subroutines")
+    print("Abaqus Error: Problem during compilation")
 if os.environ.get("FAKE_SOLVER_NO_OUTPUT") == "1":
     raise SystemExit(0)
 

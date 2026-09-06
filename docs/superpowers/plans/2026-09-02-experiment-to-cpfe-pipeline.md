@@ -1056,7 +1056,7 @@ def test_unknown_command_returns_usage_error():
 
 - [ ] **Step 2: Add multimodal offline fixtures and assertions**
 
-Extend `examples/synthetic_minimal/sample.yaml` and its fixture factory with one orientation-map table, one four-point DIC displacement grid, one `2 x 2 x 2` voxel array, one two-grain mesh/INP asset, and one three-row stress-strain time series. Add a `multimodal_sample_config` fixture to `tests/conftest.py` that writes these tiny files into pytest's `tmp_path` and returns the generated YAML path. The test must assert that the pipeline preserves each modality, its units, axis order, and parent asset links through the HDF5 export. It must not reference any path under `E:\`, `D:\`, or `C:\Users`.
+Extend `examples/synthetic_minimal/sample.yaml` and its fixture factory with one orientation-map table, one four-point DIC displacement grid, one `2 x 2 x 2` voxel array, one two-grain mesh/INP asset, and one three-row stress-strain time series. Add a `multimodal_sample_config` fixture to `tests/conftest.py` that writes these tiny files into pytest's `tmp_path` and returns the generated YAML path. The test must assert that the pipeline preserves each modality, its units, axis order, and parent asset links through the HDF5 export. It must not reference developer-machine drives, user-home directories, or local installation paths.
 
 ~~~python
 def test_offline_export_preserves_multiple_modalities(tmp_path, multimodal_sample_config):
@@ -1095,7 +1095,7 @@ Gate the test with `EXP2CPFE_RUN_ABAQUS=1`, `EXP2CPFE_ABAQUS_CONFIG`, and `EXP2C
 
 - [ ] **Step 6: Write generic documentation and CI**
 
-`docs/schema.md` documents fields, units, coordinate frames, evidence labels, asset layers, and HDF5 groups without local paths or material-specific assumptions. `docs/data-modalities.md` documents EBSD `.ang/.ctf`, vendor HDF5/DREAM.3D, DIC/DVC fields, CT/voxel arrays, diffraction/grain tables, mechanical time series, Neper/FE meshes, and the loss/registration rules for each adapter. `docs/runbook.md` documents the six CLI stages and explains that solver artifacts and manifests are evidence. `README.md` explains installation, the synthetic multimodal example, adapter extension points for EBSD/DIC/DAMASK, and the public-data boundary. The YAML key `abaqus.command` is a list of command tokens, such as `["C:\\SIMULIA\\Commands\\abaqus.bat"]`, so the same configuration model can also run a test command such as `["python", "tests/fixtures/fake_solver.py"]`.
+`docs/schema.md` documents fields, units, coordinate frames, evidence labels, asset layers, and HDF5 groups without local paths or material-specific assumptions. `docs/data-modalities.md` documents EBSD `.ang/.ctf`, vendor HDF5/DREAM.3D, DIC/DVC fields, CT/voxel arrays, diffraction/grain tables, mechanical time series, Neper/FE meshes, and the loss/registration rules for each adapter. `docs/runbook.md` documents the six CLI stages and explains that solver artifacts and manifests are evidence. `README.md` explains installation, the synthetic multimodal example, adapter extension points for EBSD/DIC/DAMASK, and the public-data boundary. The YAML key `abaqus.command` is a list of command tokens, such as `["abaqus"]`, so the same configuration model can also run a test command such as `["python", "tests/fixtures/fake_solver.py"]`.
 
 The GitHub Actions workflow installs development dependencies, runs `python -m pytest -q`, and runs `python -m build` without Abaqus or local files. The offline integration test must exercise at least an orientation table, a point/grid field, a voxel array, a mesh/INP asset, and a mechanical time series before exporting HDF5.
 
@@ -1129,11 +1129,11 @@ git commit -m "feat: add end to end offline pipeline and runbook"
 - [ ] **Step 1: Run tracked-file privacy and portability checks**
 
 ~~~powershell
-git ls-files
-rg -n -i "E:\\|D:\\|C:\\Users|password|token|secret|private[_-]?key|id_rsa|\.odb|\.cae" --glob '!docs/superpowers/**' .
+git ls-files --cached --others --exclude-standard
+rg -l -i "[a-z]:[\\/]|password|token|secret|private[_-]?key|id_rsa|\.odb|\.cae" .
 ~~~
 
-Expected: no developer-machine paths, credentials, raw ODB/CAE files, or private manifests in tracked project files. Any intentional documentation mention is generic.
+Review both tracked and non-ignored untracked candidates, including design and plan documents. The search emits filenames only; inspect any potential credentials privately without copying their values into reports. Expected: no developer-machine paths, credentials, raw ODB/CAE files, or private manifests in public candidates. Generic format mentions, prohibition rules and synthetic rejection tests must be reviewed in context. Scan reachable Git history separately; a clean worktree scan does not erase past disclosures.
 
 - [ ] **Step 2: Run the package and synthetic release checks**
 

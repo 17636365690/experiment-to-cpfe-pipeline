@@ -4,6 +4,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from experiment_to_cpfe.errors import PipelineError
 
 from experiment_to_cpfe.pipeline import (
     inspect_run,
@@ -12,13 +13,14 @@ from experiment_to_cpfe.pipeline import (
     run_export,
     run_extract_odb,
     run_validate,
+    run_stage_input_bundle,
 )
 
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pipeline")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("validate", "build-inp", "extract-odb"):
+    for name in ("validate", "build-inp", "stage-input-bundle", "extract-odb"):
         command = commands.add_parser(name)
         command.add_argument("--config", required=True, type=Path)
         command.add_argument("--run-dir", required=True, type=Path)
@@ -45,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
             result = run_validate(args.config, args.run_dir)
         elif args.command == "build-inp":
             result = run_build_inp(args.config, args.run_dir)
+        elif args.command == "stage-input-bundle":
+            result = run_stage_input_bundle(args.config, args.run_dir)
         elif args.command == "run-abaqus":
             result = run_abaqus_stage(args.config, args.run_dir, args.stage)
         elif args.command == "extract-odb":
@@ -54,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(json.dumps(inspect_run(args.run_dir), indent=2, sort_keys=True))
             return 0
-    except (OSError, ValueError, RuntimeError) as exc:
+    except (PipelineError, OSError, ValueError, RuntimeError) as exc:
         print(str(exc), file=sys.stderr)
         return 1
     return 0 if result.get("status") == "completed" else 1

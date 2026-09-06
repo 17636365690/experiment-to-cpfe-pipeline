@@ -48,6 +48,7 @@ def test_ebsd_text_preserves_coordinates_phase_orientation_and_quality(tmp_path)
 
 def test_vendor_hdf5_requires_explicit_layout(tmp_path):
     from experiment_to_cpfe.adapters.hdf5_layout import inspect_hdf5_layout
+    from experiment_to_cpfe.assets.models import AssetKind
 
     path = tmp_path / "vendor.h5"
     with h5py.File(path, "w") as handle:
@@ -56,7 +57,7 @@ def test_vendor_hdf5_requires_explicit_layout(tmp_path):
     with pytest.raises(ValueError, match="layout_name"):
         inspect_hdf5_layout(path, layout_name=None)
 
-    inspection = inspect_hdf5_layout(path, layout_name="vendor-demo")
+    inspection = inspect_hdf5_layout(path, layout_name="vendor-demo", modality_hint=AssetKind.ORIENTATION_MAP)
     assert inspection.native_layout.startswith("vendor-demo:")
     assert "Scan 1/EBSD/Data/Euler" in inspection.native_layout
 

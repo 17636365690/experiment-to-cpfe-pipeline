@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "experiment-to-cpfe"
 version = "0.1.0"
 description = "A provenance-preserving experiment-to-multiphysics data pipeline."
+readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "h5py",
@@ -30,6 +31,10 @@ pipeline = "experiment_to_cpfe.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"experiment_to_cpfe" = ["py.typed"]
+"experiment_to_cpfe._resources" = ["*.yaml"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

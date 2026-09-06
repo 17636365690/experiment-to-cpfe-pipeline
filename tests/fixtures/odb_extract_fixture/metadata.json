@@ -4,6 +4,7 @@
   "odb_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
   "requested_fields": ["S", "LE", "STATEV"],
   "missing_fields": ["STATEV"],
+  "field_units": {"S": "Pa", "LE": "1"},
   "sample_metadata": {
     "sample_id": "synthetic-odb-001",
     "experiment_id": "demo-exp",

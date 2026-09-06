@@ -1,0 +1,6 @@
+quaternion_tolerance: 1.0e-6
+require_finite: true
+missing_units_severity: error
+required_tables_by_profile: {}
+required_assets_by_solver:
+  abaqus_cpfe: [mesh, orientation_map]

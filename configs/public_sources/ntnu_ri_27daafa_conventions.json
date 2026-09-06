@@ -1,0 +1,46 @@
+{
+  "scope": "source-code evidence only; not an executable SamplePackage",
+  "revision": "27daafa01c0e0e916591371342de36e4bbdd6bb5",
+  "source_kind": "input",
+  "source_file": "Rate_Independent_UMAT/umat_CPRI.for",
+  "source_sha256": "48e78c2801bbd8c3aa6a6f451a0e71a3b30e0b7388dce99f794938f765108c58",
+  "units": {"length": null, "stress": null, "time": null, "force": null, "mass": null},
+  "orientation": {
+    "representation": "euler",
+    "angle_units": "degree",
+    "convention_id": "ntnu-euler2rotm@27daafa",
+    "matrix_relation": "R = transpose(Q), with Q returned by euler2rotm",
+    "basis_relation": "R maps crystal components to global components; global tensors become R^T A R",
+    "evidence": ["UMAT initialization around lines 427-435", "tensor transformations around lines 460-469", "euler2rotm around lines 2127-2147"],
+    "cross_library_equivalence": "not established"
+  },
+  "stress_tensor": {
+    "quantity": "UMAT STRESS interface",
+    "order": ["11", "22", "33", "12", "13", "23"],
+    "shear_scale": 1,
+    "evidence": ["STRESS matrix assembly around lines 498-500", "STRESS output assignment around line 652"],
+    "conflict": "Introductory comments list 23 before 13; executable assignments use 13 before 23"
+  },
+  "strain_increment": {
+    "quantity": "UMAT DSTRAN/DEvec, not a blanket convention for ODB or STATEV",
+    "order": ["11", "22", "33", "12", "13", "23"],
+    "shear_scale": 2,
+    "evidence": ["DEvec assembly around lines 509-510", "matrix2vecABAQUS mod D around lines 2060-2078"]
+  },
+  "crystal_elasticity": {
+    "symmetry": "cubic",
+    "evidence": "PROPS(2:4) cubic elastic constants comment around lines 370-373"
+  },
+  "coordinate": {
+    "axes": ["x", "y", "z"],
+    "frame": "native Abaqus global Cartesian frame",
+    "evidence": "Native geometry and corner coordinate labels; empty *SYSTEM in _sets.inp; no *ORIENTATION or *TRANSFORM in acquired INP bundle",
+    "physical_length_unit": null
+  },
+  "solver_readiness": "blocked",
+  "limitations": [
+    "Complete physical unit system is unresolved",
+    "Named SDV fields and ODB componentLabels must be mapped individually",
+    "Source annotations are not experimental evidence or material calibration"
+  ]
+}

@@ -54,3 +54,42 @@ export: {formats: [hdf5]}
 
     with pytest.raises(ConfigurationError, match="units"):
         load_pipeline_config(config)
+
+
+def test_config_resolves_native_input_bundle_paths(tmp_path):
+    from experiment_to_cpfe.config import load_pipeline_config
+
+    (tmp_path / "Example").mkdir()
+    (tmp_path / "Input").mkdir()
+    (tmp_path / "Example/main.inp").write_text("*Include, input=../Input/model.inp\n")
+    (tmp_path / "Input/model.inp").write_text("*Node\n1,0,0,0\n")
+    config = tmp_path / "native.yaml"
+    config.write_text(f"""
+sample:
+  sample_id: s1
+  experiment_id: e1
+  microstructure_id: m1
+  load_path_id: l1
+  schema_version: '0.1'
+  coordinate: {{name: sample, axes: [x, y, z], units: m}}
+  unit_system: {{length: m, stress: Pa, time: s}}
+  tensor_order: ['11', '22', '33', '12', '13', '23']
+  orientation: {{representation: quaternion, convention: scalar_first, angle_units: null, crystal_symmetry: cubic}}
+sources: []
+abaqus:
+  command: [abaqus]
+  job_name: native
+  input_bundle:
+    source_root: .
+    entrypoint: Example/main.inp
+    submission_dir: Example
+    license: synthetic
+export: {{formats: [hdf5]}}
+""", encoding="utf-8")
+
+    loaded = load_pipeline_config(config)
+    bundle = loaded.abaqus.input_bundle
+    assert bundle is not None
+    assert bundle.entrypoint == (tmp_path / "Example/main.inp").resolve()
+    assert bundle.source_root == tmp_path.resolve()
+    assert bundle.submission_dir == (tmp_path / "Example").resolve()
