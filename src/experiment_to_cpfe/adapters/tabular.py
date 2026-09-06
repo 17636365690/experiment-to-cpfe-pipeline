@@ -11,6 +11,7 @@ from experiment_to_cpfe.adapters.ebsd import load_ebsd_text
 from experiment_to_cpfe.adapters.fields import load_point_field
 from experiment_to_cpfe.adapters.hdf5_layout import load_hdf5_fields
 from experiment_to_cpfe.adapters.voxel import load_voxel_array
+from experiment_to_cpfe.adapters.table_blocks import read_table_block, convert_columns
 from experiment_to_cpfe.assets.models import AssetRef, ConversionRecord, DataLayer, SourceKind
 from experiment_to_cpfe.assets.registry import array_payload_sha256, table_payload_sha256
 from experiment_to_cpfe.config import PipelineConfig, TabularSourceConfig
@@ -50,6 +51,10 @@ def load_tabular_source(config: TabularSourceConfig) -> list[dict[str, object]]:
         raise ValueError("simulation_records requires simulated source evidence")
     if config.table_name == "measured_observations" and config.source_kind == SourceKind.SIMULATED:
         raise ValueError("simulated source evidence belongs in simulation_records")
+    if config.block is not None:
+        return convert_columns(read_table_block(config), config)
+    if config.format == "xlsx":
+        raise ValueError("XLSX requires an explicit block")
     records = _read_records(config)
     normalized: list[dict[str, object]] = []
     for index, record in enumerate(records):
@@ -68,7 +73,7 @@ def load_tabular_source(config: TabularSourceConfig) -> list[dict[str, object]]:
                 for target_name, source_name in config.column_map.items()
             }
         )
-    return normalized
+    return convert_columns(normalized, config)
 
 
 def _sha256(path: Path) -> str:
@@ -87,11 +92,18 @@ def assemble_sample(config: PipelineConfig) -> SamplePackage:
     assets: list[AssetRef] = []
 
     for index, source in enumerate(config.sources):
+        digest = _sha256(source.path)
         rows = load_tabular_source(source)
+        if _sha256(source.path) != digest:
+            raise ValueError(f"source changed while being parsed: {source.path}")
         source_asset_id = f"asset-source-{index:04d}"
         rows = [{**row, "source_asset_id": source_asset_id, "source_kind": source.source_kind.value} for row in rows]
         tables.setdefault(source.table_name, []).extend(rows)
-        digest = _sha256(source.path)
+        selection_metadata = {}
+        if source.block is not None:
+            selection_metadata["block"] = source.block.model_dump(mode="json")
+        if source.conversions:
+            selection_metadata["conversions"] = {k: v.model_dump(mode="json") for k, v in source.conversions.items()}
         sources.append(
             SourceRef(
                 kind=source.source_kind,
@@ -109,7 +121,7 @@ def assemble_sample(config: PipelineConfig) -> SamplePackage:
                 uri=str(source.path),
                 source_kind=source.source_kind,
                 layer=DataLayer.RAW,
-                units=source.units,
+                units={**source.units, **{name: conversion.source_unit for name, conversion in source.conversions.items()}},
                 coordinate_frame=source.coordinate_frame,
                 axis_order=source.axis_order,
                 dtype="table",
@@ -118,7 +130,8 @@ def assemble_sample(config: PipelineConfig) -> SamplePackage:
                 sha256=digest,
                 license=source.license,
                 lossy_transformations=(),
-                descriptive_metadata={"table_name": source.table_name, "column_map": dict(source.column_map),
+                descriptive_metadata={**selection_metadata, "table_name": source.table_name, "column_map": dict(source.column_map),
+                    "normalized_units": dict(source.units),
                     "row_source_binding": "source_asset_id and source_kind identify each normalized row's source"},
             )
         )
@@ -129,12 +142,13 @@ def assemble_sample(config: PipelineConfig) -> SamplePackage:
             "format": "normalized-table-json",
             "uri": f"sample-table:{source.table_name}?source_asset_id={source_asset_id}",
             "layer": DataLayer.CURATED,
+            "units": source.units,
             "native_layout": "normalized_table_explicit_columns",
             "sha256": normalized_hash,
-            "shape": (len(rows), len(source.column_map) + 2),
-            "descriptive_metadata": {"table_key": source.table_name, "row_source_asset_id": source_asset_id,
+            "shape": (len(rows), len(rows[0]) if rows else len(source.column_map) + 2),
+            "descriptive_metadata": {**selection_metadata, "table_key": source.table_name, "row_source_asset_id": source_asset_id,
                 "column_map": dict(source.column_map), "payload_hash_encoding": "normalized-table-json-v1",
-                "transformation": "explicit column selection/renaming and typed table parsing; source evidence fields attached; no unit or coordinate conversion"},
+                "transformation": "explicit block/column selection, typed parsing and recorded affine conversions; source evidence fields attached; no coordinate conversion"},
             "lossy_transformations": (
                 "Only mapped source columns are normalized; unselected columns remain in the raw source",
                 "Source formatting and textual numeric spelling are not retained in normalized records; raw source is preserved",
@@ -273,6 +287,17 @@ def assemble_sample(config: PipelineConfig) -> SamplePackage:
                     source_sha256=digest, hash_scope="logical_payload", target_payload_sha256=normalized_hash,
                     source_hash_verified=True),
             }))
+
+    from experiment_to_cpfe.adapters.native import decode_native, promote_native
+    for imported in config.imports:
+        draft = decode_native(imported)
+        new_arrays, new_assets = promote_native(draft)
+        if set(arrays).intersection(new_arrays):
+            raise ValueError("native imports contain duplicate array names")
+        arrays.update(new_arrays)
+        assets.extend(new_assets)
+        sources.extend(SourceRef(kind=source.source_kind, uri=str(source.path), sha256=draft.source_hashes[key],
+                                 role=imported.modality.value) for key, source in imported.files.items())
 
     sample = config.sample
     metadata = SampleMetadata(

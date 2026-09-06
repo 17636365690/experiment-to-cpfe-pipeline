@@ -7,6 +7,7 @@ import numpy as np
 
 from experiment_to_cpfe.assets.models import AssetKind
 from experiment_to_cpfe.assets.registry import AssetInspection
+from experiment_to_cpfe.adapters.native_numeric import reject_matlab_objects, local_hdf5_dataset
 
 
 def load_hdf5_fields(path: Path, config: dict[str, object]) -> tuple[dict[str, object], np.ndarray]:
@@ -24,6 +25,7 @@ def load_hdf5_fields(path: Path, config: dict[str, object]) -> tuple[dict[str, o
         raise ValueError("an explicit dataset_map is required for HDF5 semantic mapping")
     columns = []
     with h5py.File(Path(path), "r") as handle:
+        reject_matlab_objects(handle)
         for field, location in mapping.items():
             component = None
             if isinstance(location, str):
@@ -37,7 +39,7 @@ def load_hdf5_fields(path: Path, config: dict[str, object]) -> tuple[dict[str, o
                 raise ValueError(f"dataset path is required for {field}")
             if dataset_path not in handle or not isinstance(handle[dataset_path], h5py.Dataset):
                 raise ValueError(f"mapped HDF5 dataset is missing: {dataset_path}")
-            values = np.asarray(handle[dataset_path])
+            values = np.asarray(local_hdf5_dataset(handle, dataset_path))
             if component is not None:
                 if not isinstance(component, int) or isinstance(component, bool) or values.ndim != 2 or not 0 <= component < values.shape[1]:
                     raise ValueError(f"invalid HDF5 component selection for {field}")

@@ -1,0 +1,129 @@
+"""CPU MLP regression with case-group splits and validation-selected checkpoints."""
+
+from pathlib import Path
+import json
+import time
+
+import numpy as np
+
+from experiment_to_cpfe.mechanics.tensile import regression_metrics
+from experiment_to_cpfe.schema.validation import _unit_is_declared
+
+
+def _network(torch, width, hidden):
+    layers=[]
+    for size in hidden:
+        layers.extend([torch.nn.Linear(width,size),torch.nn.Tanh()])
+        width=size
+    layers.append(torch.nn.Linear(width,1))
+    return torch.nn.Sequential(*layers).double()
+
+
+def train_mlp(features, targets, groups, splits, *, output_dir, feature_names, feature_units,
+              target_name, target_unit, epochs=2500, patience=500, seed=42, hidden=(32,32), learning_rate=.003):
+    """Fit a regression model, then evaluate its fixed best-validation checkpoint."""
+    import torch
+    x,y=np.asarray(features,float),np.asarray(targets,float)
+    groups,splits=np.asarray(groups,str),np.asarray(splits,str)
+    if x.ndim!=2 or y.shape!=(len(x),) or groups.shape!=y.shape or splits.shape!=y.shape or not np.isfinite(x).all() or not np.isfinite(y).all():
+        raise ValueError('training requires aligned finite feature/target/group/split arrays')
+    if len(feature_names)!=x.shape[1] or len(set(feature_names))!=len(feature_names) or len(feature_units)!=x.shape[1] or not all(_unit_is_declared(v) for v in [*feature_names,*feature_units,target_name,target_unit]):
+        raise ValueError('training requires explicit feature names, units and target semantics')
+    if set(splits)!={'train','validation','test'} or any(not value.strip() for value in groups):
+        raise ValueError('train, validation and test splits with named groups are required')
+    group_splits={}
+    for group, split in zip(groups.tolist(),splits.tolist()):
+        if group in group_splits and group_splits[group]!=split:
+            raise ValueError('one group appears in multiple dataset splits')
+        group_splits[group]=split
+    if type(epochs) is not int or epochs<1 or type(patience) is not int or patience<1 or not hidden or any(type(v) is not int or v<1 for v in hidden) or not np.isfinite(learning_rate) or learning_rate<=0:
+        raise ValueError('positive training configuration required')
+    masks={split:splits==split for split in ('train','validation','test')}
+    if any(np.count_nonzero(mask)<2 for mask in masks.values()):
+        raise ValueError('each split needs at least two records')
+    output=Path(output_dir)
+    output.mkdir(parents=True,exist_ok=False)
+    mean=x[masks['train']].mean(axis=0)
+    scale=x[masks['train']].std(axis=0)
+    scale=np.where(scale>1e-12,scale,1.)
+    ymean=float(y[masks['train']].mean())
+    yscale=float(y[masks['train']].std())
+    yscale=yscale if yscale>1e-12 else 1.
+    torch.set_num_threads(1)
+    torch.manual_seed(seed)
+    model=_network(torch,x.shape[1],hidden)
+    tx=torch.tensor((x-mean)/scale,dtype=torch.float64)
+    ty=torch.tensor((y-ymean)/yscale,dtype=torch.float64)[:,None]
+    train=torch.tensor(masks['train']);validation=torch.tensor(masks['validation'])
+    optimizer=torch.optim.Adam(model.parameters(),lr=learning_rate)
+    best_loss=float('inf');best_state=None;best_epoch=0;history=[]
+    started=time.monotonic()
+    for epoch in range(1,epochs+1):
+        model.train();optimizer.zero_grad()
+        loss=torch.mean((model(tx[train])-ty[train])**2)
+        loss.backward();optimizer.step()
+        model.eval()
+        with torch.no_grad(): val_loss=float(torch.mean((model(tx[validation])-ty[validation])**2))
+        history.append({'epoch':epoch,'train_mse_standardized':float(loss.detach()),'validation_mse_standardized':val_loss})
+        if not np.isfinite([history[-1]['train_mse_standardized'],val_loss]).all():
+            raise ValueError('training produced a nonfinite loss')
+        if val_loss<best_loss-1e-10:
+            best_loss=val_loss;best_epoch=epoch
+            best_state={key:value.detach().clone() for key,value in model.state_dict().items()}
+        if epoch-best_epoch>=patience: break
+    model.load_state_dict(best_state)
+    with torch.no_grad(): prediction=model(tx).numpy().ravel()*yscale+ymean
+    checkpoint={'state_dict':best_state,'input_width':x.shape[1],'hidden':list(hidden),
+                'x_mean':torch.tensor(mean),'x_scale':torch.tensor(scale),'y_mean':ymean,'y_scale':yscale,
+                'feature_names':list(feature_names),'feature_units':list(feature_units),
+                'target_name':target_name,'target_unit':target_unit}
+    torch.save(checkpoint,output/'model.pt')
+    metrics={split:regression_metrics(y[mask],prediction[mask]) for split,mask in masks.items()}
+    baseline={split:regression_metrics(y[mask],np.full(np.count_nonzero(mask),ymean)) for split,mask in masks.items()}
+    result={'model':'MLP','hidden':list(hidden),'activation':'tanh','seed':seed,'device':'cpu','threads':1,
+            'epochs_completed':epoch,'best_epoch':best_epoch,'checkpoint_selection':'validation MSE',
+            'seconds':time.monotonic()-started,'metrics':metrics,'mean_baseline':baseline,'group_splits':group_splits,
+            'feature_names':list(feature_names),'feature_units':list(feature_units),'target_name':target_name,'target_unit':target_unit,
+            'normalization':{'fit_split':'train','x_mean':mean.tolist(),'x_scale':scale.tolist(),'y_mean':ymean,'y_scale':yscale},
+            'history':history}
+    (output/'training.json').write_text(json.dumps(result,indent=2,allow_nan=False),encoding='utf-8')
+    np.savez_compressed(output/'predictions.npz',features=x,target=y,prediction=prediction,groups=groups,splits=splits)
+    return result
+
+
+def predict_mlp(checkpoint_path, features):
+    import torch
+    saved=torch.load(Path(checkpoint_path),map_location='cpu',weights_only=True)
+    x=np.asarray(features,float)
+    if x.ndim!=2 or x.shape[1]!=saved['input_width'] or not np.isfinite(x).all():
+        raise ValueError('prediction features must be finite and match checkpoint width')
+    model=_network(torch,saved['input_width'],saved['hidden'])
+    model.load_state_dict(saved['state_dict']);model.eval()
+    values=(torch.tensor(x,dtype=torch.float64)-saved['x_mean'])/saved['x_scale']
+    with torch.no_grad(): return model(values).numpy().ravel()*saved['y_scale']+saved['y_mean']
+
+
+def run_training(config_path, output_dir):
+    """Run a configured numerical training bundle with dataset-relative input paths."""
+    import yaml
+    path=Path(config_path).resolve()
+    try:
+        config=yaml.safe_load(path.read_text(encoding='utf-8'))
+    except yaml.YAMLError as exc:
+        raise ValueError(f'invalid training configuration: {exc}') from exc
+    allowed={'dataset','feature_names','feature_units','target_name','target_unit','epochs','patience','seed','hidden','learning_rate'}
+    required={'dataset','feature_names','feature_units','target_name','target_unit'}
+    if not isinstance(config,dict) or set(config)-allowed or not required<=set(config):
+        raise ValueError('training config requires dataset and explicit feature/target declarations')
+    source=Path(config.pop('dataset'))
+    if not source.is_absolute(): source=path.parent/source
+    with np.load(source,allow_pickle=False) as payload:
+        required_arrays={'features','targets','groups','splits'}
+        if not required_arrays<=set(payload.files):
+            raise ValueError('training NPZ requires features, targets, groups and splits')
+        arrays={name:payload[name] for name in required_arrays}
+    try:
+        result=train_mlp(**arrays,output_dir=output_dir,**config)
+    except ImportError as exc:
+        raise ValueError('neural training requires the training extra') from exc
+    return {'status':'completed','model':str(Path(output_dir)/'model.pt'),'metrics':result['metrics']}

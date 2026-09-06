@@ -55,6 +55,8 @@ def _json_text(value: object) -> str:
 
 
 def _verify_logical_lineage(sample: SamplePackage) -> None:
+    from experiment_to_cpfe.adapters.native_semantics import verify_native_asset_semantics
+    verify_native_asset_semantics(sample)
     for asset in sample.assets:
         if asset.conversion is None or asset.conversion.hash_scope != "logical_payload":
             continue

@@ -8,7 +8,9 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, Validation
 
 from experiment_to_cpfe.assets.models import AssetKind, DataLayer, SourceKind
 from experiment_to_cpfe.errors import ConfigurationError
-from experiment_to_cpfe.schema.models import CoordinateSpec, OrientationSpec
+from experiment_to_cpfe.schema.models import CoordinateSpec, OrientationSpec, OrientationNotApplicable
+from experiment_to_cpfe.adapters.table_blocks import TableBlock, UnitConversion
+from experiment_to_cpfe.adapters.native_models import NativeImportConfig
 
 
 NonEmptyStr = Annotated[
@@ -28,7 +30,7 @@ class SampleConfig(BaseModel):
     coordinate: CoordinateSpec
     unit_system: dict[NonEmptyStr, NonEmptyStr]
     tensor_order: tuple[NonEmptyStr, ...] = Field(min_length=1)
-    orientation: OrientationSpec
+    orientation: OrientationSpec | OrientationNotApplicable
 
 
 class TabularSourceConfig(BaseModel):
@@ -46,7 +48,7 @@ class TabularSourceConfig(BaseModel):
     ]
     source_kind: SourceKind
     modality: AssetKind
-    format: Literal["csv", "txt", "json"]
+    format: Literal["csv", "txt", "json", "xlsx"]
     delimiter: str | None
     encoding: NonEmptyStr
     column_map: dict[NonEmptyStr, NonEmptyStr] = Field(min_length=1)
@@ -55,6 +57,8 @@ class TabularSourceConfig(BaseModel):
     axis_order: tuple[NonEmptyStr, ...]
     native_layout: NonEmptyStr
     license: NonEmptyStr | None
+    block: TableBlock | None = None
+    conversions: dict[NonEmptyStr, UnitConversion] = Field(default_factory=dict)
 
 
 class ExternalAssetConfig(BaseModel):
@@ -119,6 +123,7 @@ class PipelineConfig(BaseModel):
     sample: SampleConfig
     sources: tuple[TabularSourceConfig, ...]
     assets: tuple[ExternalAssetConfig, ...] = ()
+    imports: tuple[NativeImportConfig, ...] = ()
     solver_inputs: dict[str, object] = {}
     abaqus: AbaqusConfig
     export: ExportConfig
@@ -201,6 +206,10 @@ def load_pipeline_config(path: Path) -> PipelineConfig:
         update={
             "sources": sources,
             "assets": assets,
+            "imports": tuple(item.model_copy(update={"files": {
+                key: source.model_copy(update={"path": source.path if source.path.is_absolute()
+                                              else (base_dir / source.path).resolve()})
+                for key, source in item.files.items()}}) for item in config.imports),
             "abaqus": abaqus,
             "config_path": path,
         }

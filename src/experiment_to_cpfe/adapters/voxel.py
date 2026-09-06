@@ -7,6 +7,7 @@ import h5py
 import numpy as np
 
 from experiment_to_cpfe.adapters.vti import load_vti_scalar
+from experiment_to_cpfe.adapters.native_numeric import reject_matlab_objects, local_hdf5_dataset
 
 
 def _required(config: dict[str, object], name: str) -> object:
@@ -35,7 +36,8 @@ def load_voxel_array(
     elif format_name in {"h5", "hdf5"}:
         dataset_path = str(_required(config, "dataset_path"))
         with h5py.File(path, "r") as handle:
-            array = np.asarray(handle[dataset_path])
+            reject_matlab_objects(handle)
+            array = np.asarray(local_hdf5_dataset(handle, dataset_path))
         native_layout = f"hdf5_dataset:{dataset_path}"
     elif format_name == "json":
         dtype = str(_required(config, "dtype"))

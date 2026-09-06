@@ -17,12 +17,19 @@ The table below distinguishes the current interfaces.
 | Regular DIC/DVC grids and CT voxels | NPY, selected HDF5 dataset, nested JSON arrays, scalar ASCII VTI | Explicit spatial metadata, units and frame; VTI reads its own origin/spacing/extent |
 | SEM, DIC and other images | Native image asset references | No image decoding, segmentation or DIC processing in the pipeline |
 | Nodes, elements and grain assignments | Configured normalized tables and Abaqus input bundles | No general-purpose mesher or arbitrary mesh-format conversion |
-| Grain graphs | `SamplePackage` arrays and NPZ/PyG export | Explicit node IDs, features, edge indices, directedness and feature units; no automatic grain-graph construction |
+| Grain graphs | Configured adjacency/feature/target TXT ingestion; `SamplePackage` arrays and NPZ/PyG export | Explicit row/ID mapping, directedness, self-loop/padding policy, units and target origins |
 | Abaqus ODB field sequences | Abaqus-Python extraction followed by host loading | Completed recorded analysis, explicit requested fields/units/location and unchanged artifacts |
 | DAMASK VTI/VTK/HDF5 and YAML, Neper/FEPX formats | Native asset references; generic scalar ASCII VTI and explicit HDF5 column mapping | Complete backend material/result semantics and solver execution are not implemented |
-| Excel workbooks | Native asset references | Export selected sheets/blocks to supported tables with provenance; no XLSX ingestion adapter |
+| XLSX, instrument blocks and multirow CSV | Explicit sheet/row/column blocks and affine unit conversion | Per-block evidence, header checks and original row locations; no formula evaluation |
+| MAT5 numeric/struct/cell, HDF5 slices, multichannel NPY | Configured native numerical import | Explicit selectors and output meanings; MATLAB classes remain native references |
+| Gmsh 2.2 ASCII with Neper orientations | Selected element type/dimension, IDs, CFG reference and explicit Rodrigues conversion | No meshing or FEPX execution; backend conversion remains separate |
 
 ## Tables and time series
+
+The [native adapter guide](native-adapters.md) describes `pipeline adapt`, the
+optional `imports` list and `sources[].block`. Partially understood files can be
+decoded and reported without inventing a complete sample. XLSX blocks and MAT5
+require the `native` extra.
 
 CSV, delimited TXT, and JSON record arrays require an explicit target-to-source column map and units. Typical records include force, displacement, stress, strain, temperature, time, cycle, and control mode. Mechanical curves are calibration or validation evidence unless a user separately supplies a complete material model and parameters.
 
@@ -125,3 +132,8 @@ Only the Abaqus backend currently executes and extracts solver results. DAMASK
 `material.yaml`, `numerics.yaml`, VTI/VTK and HDF5 remain backend-specific assets.
 Neper/FEPX `.tess`, `.tesr`, `.msh`, `.ori` and `.sim` may be referenced explicitly
 without imposing Abaqus semantics.
+
+The `gmsh22` native import additionally parses the documented Gmsh 2.2 ASCII
+subset and Neper Rodrigues section. The CFG remains a companion native reference.
+The ordinary scalar voxel adapter still requires one spatial descriptor per
+axis; use a native numerical import for separate spatial/component axes.

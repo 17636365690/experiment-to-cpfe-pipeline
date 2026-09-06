@@ -107,6 +107,13 @@ class AssetManifest(BaseModel):
         known_ids = set(asset_ids)
         by_id = {asset.asset_id: asset for asset in self.assets}
         for asset in self.assets:
+            dependencies = asset.descriptive_metadata.get("dependency_hashes", {})
+            if not isinstance(dependencies, dict):
+                raise ValueError("asset dependency_hashes must be a mapping")
+            for dependency_id, digest in dependencies.items():
+                dependency = by_id.get(dependency_id)
+                if dependency is None or dependency.sha256 != digest:
+                    raise ValueError("asset dependency hash differs from referenced asset")
             if (
                 asset.parent_asset_id is not None
                 and asset.parent_asset_id not in known_ids

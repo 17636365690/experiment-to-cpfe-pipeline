@@ -1,0 +1,27 @@
+# Four synthetic points: x, y, u, v in metres. No measurement or solver result.
+imports:
+  - import_id: synthetic-points
+    profile: numeric
+    modality: point_field
+    files:
+      points:
+        path: points.txt
+        format: txt
+        source_kind: input
+        license: synthetic
+        native_layout: four synthetic rows of x y u v
+    selections:
+      point_displacements:
+        file: points
+        selector: {}
+    meanings:
+      point_displacements:
+        quantity: synthetic point coordinates and displacement
+        unit: m
+        axes: [point, component]
+        components:
+          component: [x, y, u, v]
+        source_kind: input
+        evidence: prescribed synthetic linear displacement u=0.1*x and v=0.2*y
+        role: field
+        coordinate_frame: sample

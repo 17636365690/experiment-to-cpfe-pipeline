@@ -86,6 +86,14 @@ class OrientationSpec(BaseModel):
         return self
 
 
+class OrientationNotApplicable(BaseModel):
+    """Explicit modeling applicability, distinct from unknown crystal orientation."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    representation: Literal["not_applicable"]
+    reason: NonEmptyStr
+
+
 class SampleMetadata(BaseModel):
     """Stable identifiers and conventions shared by all sample modalities."""
 
@@ -99,7 +107,7 @@ class SampleMetadata(BaseModel):
     coordinate: CoordinateSpec
     unit_system: dict[NonEmptyStr, NonEmptyStr]
     tensor_order: tuple[NonEmptyStr, ...] = Field(min_length=1)
-    orientation: OrientationSpec
+    orientation: OrientationSpec | OrientationNotApplicable
     sources: tuple[SourceRef, ...]
 
     @field_validator("tensor_order")

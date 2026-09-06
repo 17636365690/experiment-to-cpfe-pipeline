@@ -20,7 +20,11 @@ dependencies = [
 dev = [
     "build",
     "pytest",
+    "scipy",
+    "openpyxl",
 ]
+native = ["scipy", "openpyxl"]
+training = ["torch>=2.6", "scipy"]
 ml = [
     "torch",
     "torch-geometric",

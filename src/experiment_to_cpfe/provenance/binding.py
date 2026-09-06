@@ -12,6 +12,7 @@ def capture_inputs(config: PipelineConfig, config_path: Path, policy_path: Path)
     paths = [config_path, policy_path, *(s.path for s in config.sources),
              *(a.path for a in config.assets)]
     paths.extend(p for p in (config.abaqus.template_path, config.abaqus.user_subroutine) if p is not None)
+    paths.extend(source.path for imported in config.imports for source in imported.files.values())
     bundle = config.abaqus.input_bundle
     native_hashes = {}
     if bundle is not None:

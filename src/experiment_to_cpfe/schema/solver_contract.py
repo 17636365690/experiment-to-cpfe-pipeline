@@ -139,10 +139,20 @@ def inspect_mesh(blocks: list[KeywordBlock]) -> tuple[dict[int, tuple[float, ...
     return nodes, elements, nsets, elsets, errors
 
 
-def _mapping_errors(sample: SamplePackage, nodes: dict, elements: dict) -> list[str]:
+def _mapping_errors(sample: SamplePackage, nodes: dict, elements: dict, elsets: dict) -> list[str]:
     errors: list[str] = []
     mapping = sample.solver_inputs.get("microstructure_mapping")
     grains = {str(row.get("grain_id")) for row in sample.tables.get("grains", [])}
+    regions = sample.solver_inputs.get("material_region_mapping")
+    if regions is not None:
+        if mapping or sample.solver_inputs.get("material_model") not in {"isotropic_elastic", "isotropic_plastic"} or sample.solver_inputs.get("orientation_required") is not False:
+            return ["material regions require an explicitly orientation-independent isotropic model"]
+        if not isinstance(regions, dict) or not regions:
+            return ["explicit material region mapping required"]
+        for region, labels in regions.items():
+            if not isinstance(labels, (list, tuple)) or str(region).upper() not in elsets or set(labels) != elsets[str(region).upper()]:
+                return ["material region mapping differs from actual named element set"]
+        mapping, grains = regions, set(regions)
     assigned: dict[int, str] = {}
     if not isinstance(mapping, dict) or not mapping:
         return ["explicit microstructure-to-mesh mapping required"]
@@ -204,9 +214,10 @@ def _material_errors(sample: SamplePackage, blocks: list[KeywordBlock], elements
         elastic = [b for b in blocks if b.name == "*ELASTIC"]
         user = [b for b in blocks if b.name == "*USER MATERIAL"]
         depvar = [b for b in blocks if b.name == "*DEPVAR"]
-        if model == "isotropic_elastic":
-            if set(parameters) != {"E", "nu"}:
-                raise ValueError("isotropic_elastic material_parameters require E and nu only")
+        if model in {"isotropic_elastic", "isotropic_plastic"}:
+            expected = {"E", "nu", "plastic"} if model == "isotropic_plastic" else {"E", "nu"}
+            if set(parameters) != expected:
+                raise ValueError("isotropic material parameters differ from the declared profile")
             modulus, poisson = _number(parameters["E"]), _number(parameters["nu"])
             if modulus <= 0 or not -1 < poisson < 0.5:
                 raise ValueError("invalid isotropic elastic parameters")
@@ -214,7 +225,21 @@ def _material_errors(sample: SamplePackage, blocks: list[KeywordBlock], elements
                 raise ValueError("isotropic_elastic requires one plain *ELASTIC material definition")
             if [_number(value) for value in _flatten(elastic[0])] != [modulus, poisson]:
                 raise ValueError("material parameters differ from actual *ELASTIC values")
+            plastic = [b for b in blocks if b.name == "*PLASTIC"]
+            if model == "isotropic_elastic" and plastic:
+                raise ValueError("elastic profile contains an undeclared plastic material")
+            if model == "isotropic_plastic":
+                rows = parameters["plastic"]
+                if not isinstance(rows, list) or len(rows) < 2 or any(not isinstance(r, (list, tuple)) or len(r) != 2 for r in rows):
+                    raise ValueError("plastic table requires stress/plastic-strain pairs")
+                table = [[_number(v) for v in row] for row in rows]
+                if table[0][1] != 0 or any(s <= 0 or e < 0 for s, e in table) or any(b[1] <= a[1] or b[0] < a[0] for a, b in zip(table, table[1:])):
+                    raise ValueError("plastic table requires positive nondecreasing stress and increasing strain starting at zero")
+                if len(plastic) != 1 or plastic[0].options or [[_number(v) for v in row] for row in plastic[0].rows] != table:
+                    raise ValueError("plastic parameters differ from actual *PLASTIC rows")
         elif model == "umat":
+            if any(b.name == "*PLASTIC" for b in blocks):
+                raise ValueError("UMAT material contract includes an incompatible built-in plastic table")
             constants = parameters.get("constants")
             units = parameters.get("constant_units")
             count = _label(parameters.get("depvar"))
@@ -361,6 +386,8 @@ def _orientation_errors(sample: SamplePackage, blocks: list[KeywordBlock], eleme
     required = sample.solver_inputs.get("orientation_required", True) is not False
     initial = any(block.name == "*INITIAL CONDITIONS" for block in blocks)
     layout = sample.solver_inputs.get("orientation_state_variables")
+    if sample.metadata.orientation.representation == "not_applicable" and (required or layout is not None):
+        return ["required crystal orientation must have a resolved representation"]
     if not required and not initial and layout is None:
         return []
     try:
@@ -424,7 +451,7 @@ def solver_contract_errors(sample: SamplePackage, deck_text: str) -> tuple[str, 
         blocks = parse_keyword_blocks(deck_text)
     except ValueError as exc:
         return (str(exc),)
-    allowed = {"*HEADING", "*NODE", "*ELEMENT", "*NSET", "*ELSET", "*MATERIAL", "*ELASTIC", "*USER MATERIAL", "*DEPVAR", "*SOLID SECTION", "*BOUNDARY", "*STEP", "*STATIC", "*OUTPUT", "*ELEMENT OUTPUT", "*NODE OUTPUT", "*END STEP", "*INITIAL CONDITIONS"}
+    allowed = {"*HEADING", "*NODE", "*ELEMENT", "*NSET", "*ELSET", "*MATERIAL", "*ELASTIC", "*PLASTIC", "*USER MATERIAL", "*DEPVAR", "*SOLID SECTION", "*BOUNDARY", "*STEP", "*STATIC", "*OUTPUT", "*ELEMENT OUTPUT", "*NODE OUTPUT", "*END STEP", "*INITIAL CONDITIONS"}
     errors = [f"unsupported v1 keyword semantics: {name}" for name in sorted({b.name for b in blocks} - allowed)]
     options = {"*NODE": {"NSET"}, "*ELEMENT": {"TYPE", "ELSET"}, "*NSET": {"NSET", "GENERATE"}, "*ELSET": {"ELSET", "GENERATE"}, "*MATERIAL": {"NAME"}, "*USER MATERIAL": {"CONSTANTS", "UNSYMM"}, "*SOLID SECTION": {"ELSET", "MATERIAL"}, "*STEP": {"NAME", "NLGEOM", "INC"}, "*OUTPUT": {"FIELD", "FREQUENCY"}, "*INITIAL CONDITIONS": {"TYPE"}}
     for block in blocks:
@@ -446,7 +473,7 @@ def solver_contract_errors(sample: SamplePackage, deck_text: str) -> tuple[str, 
             opened = False
         elif block.name in {"*STATIC", "*OUTPUT", "*ELEMENT OUTPUT", "*NODE OUTPUT"} and not opened:
             errors.append(f"{block.name} must occur inside the analysis step")
-        elif block.name in {"*NODE", "*ELEMENT", "*MATERIAL", "*SOLID SECTION", "*ELASTIC", "*USER MATERIAL", "*DEPVAR", "*INITIAL CONDITIONS"} and step_seen:
+        elif block.name in {"*NODE", "*ELEMENT", "*MATERIAL", "*SOLID SECTION", "*ELASTIC", "*PLASTIC", "*USER MATERIAL", "*DEPVAR", "*INITIAL CONDITIONS"} and step_seen:
             errors.append(f"{block.name} must occur before the analysis step")
         if block.name == "*OUTPUT":
             field_request = "FIELD" in block.options
@@ -456,7 +483,7 @@ def solver_contract_errors(sample: SamplePackage, deck_text: str) -> tuple[str, 
         errors.append("missing *END STEP")
     nodes, elements, nsets, elsets, mesh_errors = inspect_mesh(blocks)
     errors.extend(mesh_errors)
-    errors.extend(_mapping_errors(sample, nodes, elements))
+    errors.extend(_mapping_errors(sample, nodes, elements, elsets))
     errors.extend(_material_errors(sample, blocks, elements, elsets))
     errors.extend(_loading_errors(sample, blocks, nodes, nsets))
     errors.extend(_orientation_errors(sample, blocks, elements, elsets))

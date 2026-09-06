@@ -1,79 +1,90 @@
-# Version 0.1 scope and limitations
+# Version 0.1 scope and operating conditions
 
-The first version targets reproducible single-sample ingestion, validation,
-Abaqus preparation/execution and data packaging. The supported paths and
-registration-only formats are listed in [data-modalities.md](data-modalities.md).
-An extension point is not a completed adapter.
+Version 0.1 supports single-sample ingestion, validation, Abaqus preparation and
+execution, result extraction, and HDF5/NPZ packaging. The
+[format guide](data-modalities.md) identifies implemented parsers and formats
+handled as native references.
 
 ## Scientific interpretation
 
-- A complete CPFE material model, parameters, mesh, grain assignments,
-  orientations, coordinate/unit conventions, boundary conditions and outputs
-  must be supplied explicitly. The package does not calibrate a constitutive
-  model automatically from a stress–strain curve.
-- Readiness checks establish the declared input contract. They do not validate
-  constitutive equations, parameter identifiability, mesh convergence or
-  agreement with experiments. Abaqus datacheck and a successful analysis do not
-  replace those scientific checks.
-- The checked solver profile supports flat three-dimensional solid meshes, one
-  named isotropic-elastic or explicit UMAT material, and one static displacement
-  loading step. It checks actual deck content against declarations. Explicit
-  grain-orientation columns may be mapped to UMAT STATEV indices and verified
-  against complete `*INITIAL CONDITIONS, TYPE=SOLUTION` initialization. Other
-  orientation schemes, assembly scoping, periodic equations and additional
-  constitutive/loading semantics require adapters and are blocked by this initial
-  profile. UMAT support does not itself implement crystal plasticity.
-- Unit strings are declared metadata; the pipeline does not perform a general
-  dimensional-analysis or unit-conversion calculation. Orientation conventions
-  are not silently converted. Coordinate transforms, spatial registration and
-  time synchronization are not automatically estimated.
-- `measured`, `inferred`, `input` and `simulated` describe evidence origin. Tiny
-  synthetic fixtures carry explicit synthetic descriptions. Test fixtures and
-  successful export tests are not new experimental or solver evidence.
+A CPFE run needs a material model and parameters, mesh and grain assignments,
+orientations, coordinate and unit conventions, loading conditions and output
+definitions. Mechanical curves serve as calibration or validation targets.
+Readiness checks this declared input contract. Physical validation additionally
+examines constitutive behavior, parameter identification, mesh convergence and
+agreement with experiments.
+
+The checked Abaqus profile supports flat three-dimensional solid meshes, one
+named isotropic-elastic, isotropic-plastic or explicit UMAT material, and one static displacement
+step. It compares the deck with the sample declarations. Grain-orientation
+columns can map to UMAT STATEV indices through complete
+`*INITIAL CONDITIONS, TYPE=SOLUTION` initialization. Assembly scoping, periodic
+equations and additional material/loading schemes need dedicated profiles.
+The constitutive implementation comes from the supplied material model or UMAT.
+The isotropic-plastic profile uses explicit elastic constants and an increasing
+stress/plastic-strain table. Isotropic continuum models can declare a material
+region and a reasoned inapplicable orientation. Crystalline profiles retain their
+orientation and grain-assignment requirements.
+
+Units are explicit per quantity. Table adapters execute declared affine
+conversions and preserve source and target units. Coordinate transforms,
+spatial registration and time synchronization require their own definitions.
+`measured`, `inferred`, `input` and `simulated` record evidence origin, while
+synthetic fixtures retain their generator description.
 
 ## Input and result coverage
 
-- Configured ANG/CTF and generic EBSD text profiles and explicit HDF5 dataset
-  mapping are supported. Vendor binary EBSD decoding and automatic HDF5 layout
-  discovery/translation are not.
-- Image correlation, segmentation, voxel-to-mesh conversion, general mesh
-  generation and automatic grain-graph extraction are not implemented.
-- Scalar ASCII VTI ImageData has an explicit adapter. Binary/appended/vector VTI,
-  general VTK layouts, DAMASK-specific material/result semantics and Neper/FEPX
-  semantic ingestion/execution remain extension work. Excel blocks must first be
-  converted explicitly to a supported table format with source and loss records.
-- ODB extraction is limited to requested field outputs. It does not currently
-  extract every Abaqus history-output type or compute homogenized stress/strain
-  curves. Requested absent fields or locations are reported, never zero-filled.
-  Small-strain `E` and logarithmic strain `LE` are distinct fields and are never
-  substituted for one another by the extractor.
-- Large datasets are loaded into memory by several adapters and exports. The
-  default workflow is one small sample; distributed execution, streaming
-  conversion, resumable batch scheduling and model training are out of scope.
-- The sample contract currently requires coordinate and orientation metadata
-  even for some table-only studies. Supply only documented conventions; retain
-  unresolved material as native references until it can be normalized honestly.
+Configured ANG/CTF/text EBSD, selected HDF5 datasets, MAT5 numeric/struct/cell
+arrays, multichannel NPY, instrument blocks and XLSX value blocks have readers.
+Selected spreadsheet formulas need an evaluated-value export. Vendor binary
+EBSD and MATLAB class/MCOS data use upstream numerical exports.
 
-## Reproducibility and release
+Geometry support includes scalar ASCII VTI and a selected Gmsh 2.2 ASCII profile
+with native Neper Rodrigues orientations. Binary/vector VTI, general VTK,
+DAMASK result semantics and FEPX execution are subsequent adapter work.
+Image correlation, segmentation, meshing and graph construction supply inputs
+through upstream tools.
 
-Input and artifact hashes detect accidental changes and bind stage evidence.
-They are not signatures and do not authenticate an arbitrary external ODB or
-protect against an actor who can rewrite both data and manifests. The trusted
-runner executable and the source/license statements remain the caller's
-responsibility. Run manifests may contain local paths and belong outside the
-public repository.
+ODB extraction reads requested field outputs and reports missing fields or
+locations. Small-strain `E` and logarithmic strain `LE` retain their distinct
+field names and measures. Broader history outputs and homogenized response
+calculations need additional extractors or postprocessing.
 
-The public NTNU source manifest pins a small input bundle and its file hashes.
-Its presence does not establish a verified public CPFE-to-HDF5 scientific
-benchmark. Full physical unit/convention confirmation is still required before
-that case can pass solver readiness, and its periodic equations require an
-additional checked profile. Local toolchain/DISP checks verify the installed
-compile/link path. The small synthetic elastic solve additionally exercises real
-ODB extraction and HDF5/NPZ packaging with an analytic elastic check; it does not
-validate NTNU crystal-plasticity physics against public experiments.
+The complete sample contract includes coordinates and orientation applicability.
+`pipeline adapt` handles earlier ingestion work, keeping selected arrays and
+listing declarations needed for promotion. The
+[native adapter guide](native-adapters.md) gives configurations and examples.
 
-The repository has no project-wide license selection yet. External MIT or
-CC-BY source descriptions apply only to those sources and do not license this
-project. Tests, build results, public-file review and remaining release actions
-are recorded in the [release checklist](release_checklist.md) and dated
-verification reports.
+## Working size and data quality
+
+The default workflow processes a small sample. Several readers and exports hold
+arrays in memory. HDF5 slicing and NPY selection bound the requested array,
+while peak memory also depends on compressed chunks and selected MAT5 variables.
+MAT5 cell/struct decoding loads the selected variable before accessing a leaf.
+HDF5 reference/compound and external/virtual storage need an upstream conversion
+that records their dependencies.
+
+Quality masks and residuals preserve source values. Drafts retain nonfinite
+entries for inspection, and canonical promotion uses an explicitly selected
+finite subset. Group-split checks cover one canonical sample. Collections with
+multiple files need a dataset-level split policy. The optional CPU MLP interface
+trains explicitly grouped numerical bundles and selects its checkpoint on the
+validation split. Distributed execution and broader training architectures are
+later workflow extensions.
+
+## Verification and distribution
+
+Source records and stage receipts keep inputs, conversions and outputs traceable.
+Run manifests belong with local run artifacts. Public candidates contain generic
+code, documentation and small synthetic fixtures.
+
+The public NTNU input bundle still needs full unit/convention confirmation and
+a profile for periodic equations. Existing toolchain/DISP checks establish the
+compile/link path. The recorded synthetic elastic solve exercises ODB extraction
+and HDF5/NPZ packaging against an analytic elastic result. Public experimental
+CPFE validation remains a separate work item.
+
+Project-wide license selection awaits the owner's decision. External MIT and
+CC-BY labels describe their respective sources. Build and test evidence is
+recorded in the [release checklist](release_checklist.md) and dated verification
+reports.

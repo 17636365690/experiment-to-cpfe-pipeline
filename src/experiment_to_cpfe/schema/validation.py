@@ -319,8 +319,8 @@ def check_deck_readiness(sample: SamplePackage, deck_text: str) -> SolverReadine
         missing.append("coordinate.units must match declared unit_system.length; normalize explicitly")
     if AssetKind.MESH not in modalities:
         missing.append("geometry/mesh asset")
-    if not inputs.get("microstructure_mapping"):
-        missing.append("microstructure-to-mesh mapping")
+    if not (inputs.get("microstructure_mapping") or inputs.get("material_region_mapping")):
+        missing.append("microstructure-to-mesh or material-region mapping")
     if not inputs.get("material_model"):
         missing.append("material model")
     if not (

@@ -1,0 +1,219 @@
+{
+  "case": "KupferDigital CuSn8Ni2 uniform tensile gauge",
+  "source": {
+    "title": "KupferDigital mechanical testing datasets: Brinell hardness, Vickers hardness, and tensile tests",
+    "creators": "Hossein Beygi Nasrabadi et al.",
+    "doi": "10.5281/zenodo.10820299",
+    "url": "https://doi.org/10.5281/zenodo.10820299",
+    "license": "CC-BY-4.0",
+    "license_url": "https://creativecommons.org/licenses/by/4.0/"
+  },
+  "strain_window": {
+    "measure": "engineering strain from preload origin",
+    "min": 0,
+    "max": 0.008
+  },
+  "model_scope": "small-strain homogeneous square gauge with isotropic bilinear plasticity",
+  "experiment_roles": {
+    "H_08": "calibration",
+    "H_16": "model_check",
+    "H_18": "final_holdout"
+  },
+  "real_fe": {
+    "cases": 12,
+    "completed_stages": 84,
+    "maximum_analytic_nrmse": 3.891098474495406e-06,
+    "maximum_force_balance_error_N": 0.0
+  },
+  "neural": {
+    "architecture": "4-32-32-1 MLP, Tanh",
+    "seed": 42,
+    "epochs_completed": 2500,
+    "best_epoch": 2500,
+    "group_counts": {
+      "train": 5,
+      "validation": 2,
+      "test": 2
+    },
+    "row_counts": {
+      "train": 405,
+      "validation": 162,
+      "test": 162
+    },
+    "normalization_fit_split": "train",
+    "checkpoint_selection": "validation MSE"
+  },
+  "metrics": {
+    "surrogate": {
+      "train": {
+        "rmse": 0.3239419632577817,
+        "mae": 0.19466721730232972,
+        "bias": 0.000422580157827206,
+        "max_abs_error": 2.5336262619806575,
+        "nrmse": 0.0016796280343509857,
+        "r2": 0.9999583196591995,
+        "count": 405
+      },
+      "validation": {
+        "rmse": 0.6633574589637113,
+        "mae": 0.5353568198473785,
+        "bias": 0.09190872654647299,
+        "max_abs_error": 2.5056475782401435,
+        "nrmse": 0.003665001890859857,
+        "r2": 0.9998190818204182,
+        "count": 162
+      },
+      "test": {
+        "rmse": 0.6823805006440486,
+        "mae": 0.577073034680984,
+        "bias": 0.06952855750629751,
+        "max_abs_error": 2.8467302419301177,
+        "nrmse": 0.0036926864138857774,
+        "r2": 0.9998100351913246,
+        "count": 162
+      }
+    },
+    "mean_baseline": {
+      "train": {
+        "rmse": 50.176640363644466,
+        "mae": 39.788696864834925,
+        "bias": 7.859830756062342e-15,
+        "max_abs_error": 130.92003086523758,
+        "nrmse": 0.2601641694603762,
+        "r2": 0.0,
+        "count": 405
+      },
+      "validation": {
+        "rmse": 49.31907342870213,
+        "mae": 39.68332677874057,
+        "bias": -0.3066790533985804,
+        "max_abs_error": 130.92003086523758,
+        "nrmse": 0.27248430680800945,
+        "r2": -3.866831107512958e-05,
+        "count": 162
+      },
+      "test": {
+        "rmse": 49.51130762111432,
+        "mae": 39.700564107987795,
+        "bias": -0.40269978354408514,
+        "max_abs_error": 130.92003086523758,
+        "nrmse": 0.26792930456489994,
+        "r2": -6.615805527454555e-05,
+        "count": 162
+      }
+    },
+    "experiment": {
+      "H_08": {
+        "role": "calibration",
+        "fe": {
+          "rmse": 4.624309341431109,
+          "mae": 3.4989575778689663,
+          "bias": 0.4985974074560801,
+          "max_abs_error": 13.483113365188089,
+          "nrmse": 0.026548497662386327,
+          "r2": 0.9910475340493605,
+          "count": 161
+        },
+        "neural": {
+          "rmse": 4.678204361707376,
+          "mae": 3.5715608711734435,
+          "bias": 0.5060691934125673,
+          "max_abs_error": 12.590268338718545,
+          "nrmse": 0.026857912909977858,
+          "r2": 0.9908376410859284,
+          "count": 161
+        }
+      },
+      "H_16": {
+        "role": "model_check",
+        "fe": {
+          "rmse": 4.204327925748698,
+          "mae": 3.38563928515263,
+          "bias": -0.14586008053152846,
+          "max_abs_error": 11.562912325695336,
+          "nrmse": 0.024135402777461352,
+          "r2": 0.9924972569695728,
+          "count": 161
+        },
+        "neural": {
+          "rmse": 4.2545324763437655,
+          "mae": 3.4768708724117534,
+          "bias": -0.13838829457504134,
+          "max_abs_error": 10.59218782243137,
+          "nrmse": 0.02442360747302101,
+          "r2": 0.9923170042404572,
+          "count": 161
+        }
+      },
+      "H_18": {
+        "role": "final_holdout",
+        "fe": {
+          "rmse": 4.427883197320176,
+          "mae": 3.586289911433838,
+          "bias": -0.7610756926847684,
+          "max_abs_error": 11.48773862038496,
+          "nrmse": 0.025273805382074174,
+          "r2": 0.9918445163569627,
+          "count": 161
+        },
+        "neural": {
+          "rmse": 4.476514660668829,
+          "mae": 3.664737710401024,
+          "bias": -0.7536039067282813,
+          "max_abs_error": 10.439314516139774,
+          "nrmse": 0.025551387713257438,
+          "r2": 0.9916643891548846,
+          "count": 161
+        }
+      }
+    },
+    "numerical_checks": {
+      "nu_low": {
+        "rmse": 0.0,
+        "mae": 0.0,
+        "bias": 0.0,
+        "max_abs_error": 0.0,
+        "nrmse": 0.0,
+        "r2": 1.0,
+        "count": 41
+      },
+      "nu_high": {
+        "rmse": 0.0,
+        "mae": 0.0,
+        "bias": 0.0,
+        "max_abs_error": 0.0,
+        "nrmse": 0.0,
+        "r2": 1.0,
+        "count": 41
+      },
+      "mesh8": {
+        "rmse": 0.0,
+        "mae": 0.0,
+        "bias": 0.0,
+        "max_abs_error": 0.0,
+        "nrmse": 0.0,
+        "r2": 1.0,
+        "count": 41
+      }
+    },
+    "experimental_repeatability": {
+      "rmse": 0.8419686082453597,
+      "mae": 0.7269167074986367,
+      "bias": 0.6152156121532399,
+      "max_abs_error": 1.2434963871514242,
+      "nrmse": 0.0048334125798147765,
+      "r2": 0.9996991024119085,
+      "count": 161
+    },
+    "neural_test_target_met": true
+  },
+  "metric_units": {
+    "rmse": "MPa",
+    "mae": "MPa",
+    "bias": "MPa",
+    "max_abs_error": "MPa",
+    "nrmse": "1",
+    "r2": "1"
+  },
+  "nrmse_definition": "RMSE divided by maximum absolute reference stress in the compared sequence"
+}
