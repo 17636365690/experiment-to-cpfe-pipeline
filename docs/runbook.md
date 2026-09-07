@@ -225,6 +225,23 @@ Deleting or moving the extraction directory cannot revert the run to an
 experiment-only export. Missing evidence produces `blocked`; use a new run for a
 different workflow rather than removing stage artifacts.
 
+## Build a training collection
+
+```text
+pipeline build-training-dataset --config build.yaml --run-dir runs/training-data-001
+pipeline train-surrogate --config runs/training-data-001/training-config.json --run-dir runs/model-001
+```
+
+The build configuration lists canonical HDF5 inputs, layouts, scalar quantities
+and a grouping policy. The command writes dataset.npz, dataset.json,
+training-config.json and build-manifest.json into a new directory. Source paths
+are relative to the build configuration. The generated training configuration
+uses a dataset-relative path and can include the existing MLP settings.
+
+The [training dataset guide](training-datasets.md) gives complete table and array
+selectors. The [synthetic training example](../examples/synthetic_training/README.md)
+generates both layouts without a solver. Training requires the `training` extra.
+
 ## Inspect
 
 ```text

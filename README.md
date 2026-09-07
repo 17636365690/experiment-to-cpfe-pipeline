@@ -89,6 +89,21 @@ The training configuration specifies the dataset, feature and target units,
 and model settings. Each parameter case belongs to one split: train, validation
 or test.
 
+## 从规范化样本构建训练集
+
+当前源码新增配置驱动的训练集构建入口。它从多个项目 HDF5 的表列或数组分量中
+选取特征和标量目标，按行身份对齐，核对单位并检查跨文件分组。
+生成的 NPZ 和训练配置可以直接交给现有 MLP：
+
+```text
+pipeline build-training-dataset --config build.yaml --run-dir runs/dataset-001
+pipeline train-surrogate --config runs/dataset-001/training-config.json --run-dir runs/model-001
+```
+
+[训练数据指南](docs/training-datasets.md) 说明配置与来源记录，
+[两种合成布局](examples/synthetic_training/README.md) 可以在 CPU 上完整运行。
+此入口尚未包含在已发布的 v0.1.0 安装包中，请在当前源码安装 `.[training]`。
+
 ## Offline synthetic example
 
 The example uses small synthetic CSV, JSON and INP files to exercise a mechanical

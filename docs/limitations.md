@@ -66,11 +66,19 @@ that records their dependencies.
 
 Quality masks and residuals preserve source values. Drafts retain nonfinite
 entries for inspection, and canonical promotion uses an explicitly selected
-finite subset. Group-split checks cover one canonical sample. Collections with
-multiple files need a dataset-level split policy. The optional CPU MLP interface
+finite subset. The training collection builder checks identities and group splits
+across canonical files using a declared sample, experiment or case grouping.
+Its target-source check keeps each raw target origin within one split, including
+when that origin contains multiple specimens. The optional CPU MLP interface
 trains explicitly grouped numerical bundles and selects its checkpoint on the
 validation split. Distributed execution and broader training architectures are
 later workflow extensions.
+
+Training collection selection supports table columns and scalar array components,
+exact identity alignment, shared row slicing and explicit affine conversions.
+It holds the assembled collection in memory. Aggregation, interpolation and
+registration belong in upstream processing with recorded definitions. See the
+[training dataset guide](training-datasets.md) for input and output contracts.
 
 ## Verification and distribution
 

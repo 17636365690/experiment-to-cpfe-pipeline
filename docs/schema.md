@@ -125,3 +125,17 @@ arbitrary vendor HDF5 files. Vendor files remain external native assets with
 hashes and explicit layout descriptions. NPZ/PyG exports derive from a verified
 canonical HDF5 file and record their loss of HDF5 storage layout, compression and
 attributes outside the modeled sample contract.
+
+## Training collection
+
+`build-training-dataset` assembles selected scalar columns from multiple canonical
+packages. The `experiment-to-cpfe-training-1` NPZ stores features, targets, groups,
+splits, sample_ids and JSON-encoded row identities. Its metadata records ordered
+quantity names/units, each sample's assets and sources, column selections,
+conversions, source row indices and the collection configuration.
+
+Exact row identities establish one-to-one alignment. Collection grouping uses
+sample_id, experiment_id or an explicitly declared group_id. The builder and MLP
+share the group/split contract. Training bundles also retain content receipts,
+which the configured training entry checks before creating model outputs.
+See the [training dataset guide](training-datasets.md) for the configuration.

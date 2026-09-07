@@ -20,7 +20,7 @@ from experiment_to_cpfe.pipeline import (
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="pipeline")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("adapt", "train-surrogate", "validate", "build-inp", "stage-input-bundle", "extract-odb"):
+    for name in ("adapt", "build-training-dataset", "train-surrogate", "validate", "build-inp", "stage-input-bundle", "extract-odb"):
         command = commands.add_parser(name)
         command.add_argument("--config", required=True, type=Path)
         command.add_argument("--run-dir", required=True, type=Path)
@@ -43,7 +43,10 @@ def main(argv: list[str] | None = None) -> int:
     except SystemExit as exc:
         return int(exc.code)
     try:
-        if args.command == "train-surrogate":
+        if args.command == "build-training-dataset":
+            from experiment_to_cpfe.datasets.training import run_dataset_build
+            result = run_dataset_build(args.config, args.run_dir)
+        elif args.command == "train-surrogate":
             from experiment_to_cpfe.learning.surrogate import run_training
             result = run_training(args.config, args.run_dir)
         elif args.command == "adapt":

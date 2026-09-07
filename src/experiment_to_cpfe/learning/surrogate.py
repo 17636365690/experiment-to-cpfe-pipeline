@@ -1,13 +1,17 @@
 """CPU MLP regression with case-group splits and validation-selected checkpoints."""
 
 from pathlib import Path
+import hashlib
 import json
+from numbers import Real
 import time
 
 import numpy as np
 
 from experiment_to_cpfe.mechanics.tensile import regression_metrics
 from experiment_to_cpfe.schema.validation import _unit_is_declared
+from experiment_to_cpfe.learning.data_contract import read_training_bundle, validate_group_splits
+from experiment_to_cpfe.provenance.hashing import sha256_file
 
 
 def _network(torch, width, hidden):
@@ -27,20 +31,27 @@ def train_mlp(features, targets, groups, splits, *, output_dir, feature_names, f
     groups,splits=np.asarray(groups,str),np.asarray(splits,str)
     if x.ndim!=2 or y.shape!=(len(x),) or groups.shape!=y.shape or splits.shape!=y.shape or not np.isfinite(x).all() or not np.isfinite(y).all():
         raise ValueError('training requires aligned finite feature/target/group/split arrays')
-    if len(feature_names)!=x.shape[1] or len(set(feature_names))!=len(feature_names) or len(feature_units)!=x.shape[1] or not all(_unit_is_declared(v) for v in [*feature_names,*feature_units,target_name,target_unit]):
+    if (
+        not isinstance(feature_names, (list, tuple, np.ndarray))
+        or not isinstance(feature_units, (list, tuple, np.ndarray))
+        or not all(_unit_is_declared(v) for v in [*feature_names, *feature_units, target_name, target_unit])
+        or len(feature_names) != x.shape[1]
+        or len(set(feature_names)) != len(feature_names)
+        or len(feature_units) != x.shape[1]
+    ):
         raise ValueError('training requires explicit feature names, units and target semantics')
-    if set(splits)!={'train','validation','test'} or any(not value.strip() for value in groups):
-        raise ValueError('train, validation and test splits with named groups are required')
-    group_splits={}
-    for group, split in zip(groups.tolist(),splits.tolist()):
-        if group in group_splits and group_splits[group]!=split:
-            raise ValueError('one group appears in multiple dataset splits')
-        group_splits[group]=split
-    if type(epochs) is not int or epochs<1 or type(patience) is not int or patience<1 or not hidden or any(type(v) is not int or v<1 for v in hidden) or not np.isfinite(learning_rate) or learning_rate<=0:
+    group_splits=validate_group_splits(groups,splits)
+    if (
+        type(epochs) is not int or epochs < 1
+        or type(patience) is not int or patience < 1
+        or not isinstance(hidden, (list, tuple)) or not hidden
+        or any(type(v) is not int or v < 1 for v in hidden)
+        or isinstance(learning_rate, bool) or not isinstance(learning_rate, Real)
+        or not np.isfinite(learning_rate) or learning_rate <= 0
+        or type(seed) is not int or not -(2**63) <= seed < 2**64
+    ):
         raise ValueError('positive training configuration required')
     masks={split:splits==split for split in ('train','validation','test')}
-    if any(np.count_nonzero(mask)<2 for mask in masks.values()):
-        raise ValueError('each split needs at least two records')
     output=Path(output_dir)
     output.mkdir(parents=True,exist_ok=False)
     mean=x[masks['train']].mean(axis=0)
@@ -107,23 +118,36 @@ def run_training(config_path, output_dir):
     """Run a configured numerical training bundle with dataset-relative input paths."""
     import yaml
     path=Path(config_path).resolve()
+    config_bytes=path.read_bytes()
     try:
-        config=yaml.safe_load(path.read_text(encoding='utf-8'))
+        config=yaml.safe_load(config_bytes.decode('utf-8'))
     except yaml.YAMLError as exc:
         raise ValueError(f'invalid training configuration: {exc}') from exc
-    allowed={'dataset','feature_names','feature_units','target_name','target_unit','epochs','patience','seed','hidden','learning_rate'}
+    allowed={'dataset','dataset_sha256','feature_names','feature_units','target_name','target_unit','epochs','patience','seed','hidden','learning_rate'}
     required={'dataset','feature_names','feature_units','target_name','target_unit'}
     if not isinstance(config,dict) or set(config)-allowed or not required<=set(config):
         raise ValueError('training config requires dataset and explicit feature/target declarations')
+    if not isinstance(config['dataset'],str) or not config['dataset'].strip():
+        raise ValueError('training dataset must be a nonblank path string')
     source=Path(config.pop('dataset'))
     if not source.is_absolute(): source=path.parent/source
+    source=source.resolve()
+    source_hash=sha256_file(source)
+    expected_hash=config.pop('dataset_sha256',None)
+    if expected_hash is not None and expected_hash!=source_hash:
+        raise ValueError('training dataset file hash differs from configuration')
     with np.load(source,allow_pickle=False) as payload:
-        required_arrays={'features','targets','groups','splits'}
-        if not required_arrays<=set(payload.files):
-            raise ValueError('training NPZ requires features, targets, groups and splits')
-        arrays={name:payload[name] for name in required_arrays}
+        arrays,metadata=read_training_bundle(payload,config)
+    if sha256_file(source)!=source_hash:
+        raise ValueError('training dataset changed during reading')
+    receipt={'path':str(source),'sha256':source_hash,'training_config_sha256':hashlib.sha256(config_bytes).hexdigest(),
+             'metadata':metadata}
     try:
         result=train_mlp(**arrays,output_dir=output_dir,**config)
     except ImportError as exc:
         raise ValueError('neural training requires the training extra') from exc
+    result['dataset']={'path':str(source),'sha256':source_hash,'receipt':'dataset-receipt.json'}
+    output=Path(output_dir)
+    (output/'dataset-receipt.json').write_text(json.dumps(receipt,indent=2,ensure_ascii=False,allow_nan=False),encoding='utf-8')
+    (output/'training.json').write_text(json.dumps(result,indent=2,allow_nan=False),encoding='utf-8')
     return {'status':'completed','model':str(Path(output_dir)/'model.pt'),'metrics':result['metrics']}

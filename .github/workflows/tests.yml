@@ -25,3 +25,18 @@ jobs:
         env:
           EXP2CPFE_WHEEL_DIR: dist
         run: python -m pytest -q tests/integration/test_installed_wheel.py
+
+  cpu-training:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install "torch>=2.6" --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -e ".[dev,training]"
+      - name: Require CPU training dependencies
+        run: python -c "import torch; assert torch.version.cuda is None; print(torch.__version__)"
+      - name: Build collections and exercise real optimization and checkpoint readback
+        run: python -m pytest -q tests/unit/test_training_dataset.py tests/unit/test_surrogate_training.py tests/integration/test_training_dataset_pipeline.py

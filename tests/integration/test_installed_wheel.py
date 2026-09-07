@@ -21,6 +21,7 @@ def test_wheel_installation_outside_checkout(tmp_path, multimodal_sample_config)
 import sys
 from pathlib import Path
 import subprocess
+import runpy
 sys.path.insert(0,sys.argv[1])
 import experiment_to_cpfe
 assert Path(experiment_to_cpfe.__file__).is_relative_to(Path(sys.argv[1]))
@@ -34,8 +35,14 @@ script=Path(cmd[2])
 assert script.is_relative_to(Path(sys.argv[1]))
 r=subprocess.run([sys.executable,str(script),'--help'],capture_output=True,text=True)
 assert r.returncode==0,r.stderr
-print('Installed-wheel validate and extractor help passed')
+prepare=runpy.run_path(sys.argv[4])['prepare']
+prepare(Path('training-inputs'))
+assert main(['build-training-dataset','--config','training-inputs/array/build.yaml','--run-dir','training-data'])==0
+from experiment_to_cpfe.datasets.training import build_training_dataset
+import inspect
+assert Path(inspect.getfile(build_training_dataset)).is_relative_to(Path(sys.argv[1]))
+print('Installed-wheel validate, extractor help and training dataset build passed')
 """
-    result=subprocess.run([sys.executable,'-I','-c',code,str(target),str(multimodal_sample_config),str(tmp_path/'run')],
+    result=subprocess.run([sys.executable,'-I','-c',code,str(target),str(multimodal_sample_config),str(tmp_path/'run'),str(Path('examples/synthetic_training/prepare.py').resolve())],
                           cwd=tmp_path,capture_output=True,text=True)
     assert result.returncode==0,result.stdout+result.stderr

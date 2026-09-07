@@ -168,8 +168,9 @@ component count, quaternion norms and orthonormal rotation matrices.
 and `evidence` identifying the within-state alignment. Quality flags and residuals
 remain separate arrays. Drafts retain nonfinite values and their counts, while
 canonical promotion uses an explicitly selected finite subset. Targets from one
-group use one split within a canonical sample. Multi-file collections need a
-dataset-level split policy.
+group use one split within a canonical sample. The
+[training collection builder](training-datasets.md) applies a configured split
+policy across files and checks it against registered target declarations.
 
 ## Mesh, graph and stiffness profiles
 
