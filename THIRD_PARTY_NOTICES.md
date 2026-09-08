@@ -39,6 +39,29 @@ source record and keep them in a local data directory.
 Reuse of the processed files should retain this attribution, license link
 and processing description. The source authors do not endorse this project.
 
+## GH4169 ultrasonic case: separately obtained CC BY-NC 3.0 data
+
+Source: *Data for: A multi-parameter ultrasonic evaluation of mean grain size
+using optimization*, version 1, 27 May 2019. Contributors: Xi Chen, Guanhua Wu,
+Zhenggan Zhou and chen hao.
+
+Source DOI: https://doi.org/10.17632/v487vwmd7r.1
+
+License: Creative Commons Attribution-NonCommercial 3.0 Unported,
+https://creativecommons.org/licenses/by-nc/3.0/.
+
+`examples/gh4169_ultrasonic/` contains original project scripts and source
+references. Obtain DATA.xlsx and the six metallographic JPG files separately.
+Keep the original data, normalized HDF5/NPZ, trained weights and result figures
+in ignored local storage under the source attribution and noncommercial terms.
+Apache-2.0 for project code does not change those data terms. No GH4169 raw
+measurements or weights are included in the Python distributions.
+
+Processing selects the original specimen mean attenuation and longitudinal
+velocity, with metallographic mean grain diameter as target. The project fits
+training-only normalization and new MLP/linear baselines. It retains T1/T2 for
+test evaluation and does not reuse the author's fitted multi-parameter model.
+
 ## External references and optional inputs
 
 `configs/public_sources/ntnu_ri_27daafa.json` identifies an optional fixed

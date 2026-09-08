@@ -68,8 +68,12 @@ Quality masks and residuals preserve source values. Drafts retain nonfinite
 entries for inspection, and canonical promotion uses an explicitly selected
 finite subset. The training collection builder checks identities and group splits
 across canonical files using a declared sample, experiment or case grouping.
-Its target-source check keeps each raw target origin within one split, including
-when that origin contains multiple specimens. The optional CPU MLP interface
+Its target-source check keeps each raw target origin within one split by default.
+Native table blocks can declare an original specimen column and evidence, with
+verified row provenance, to partition a shared file into independent specimens.
+Repeated specimen identities and overlapping physical source rows remain within
+one split. This declaration does not establish independence between material batches.
+The optional CPU MLP interface
 trains explicitly grouped numerical bundles and selects its checkpoint on the
 validation split. Distributed execution and broader training architectures are
 later workflow extensions.
@@ -79,6 +83,14 @@ exact identity alignment, shared row slicing and explicit affine conversions.
 It holds the assembled collection in memory. Aggregation, interpolation and
 registration belong in upstream processing with recorded definitions. See the
 [training dataset guide](training-datasets.md) for input and output contracts.
+
+The GH4169 ultrasonic example contains ten specimen summaries from one study.
+It retains the author's two test specimens and uses nested holdouts for the other
+eight. Its fixed two-feature MLP is less accurate than ordinary linear regression
+on both checks. These results exercise the ingestion and training workflow;
+additional independent specimens and acquisition conditions are needed to assess
+transfer to other material batches. The raw waveforms and metallographic
+measurement replicates are unavailable in the selected workbook.
 
 ## Verification and distribution
 

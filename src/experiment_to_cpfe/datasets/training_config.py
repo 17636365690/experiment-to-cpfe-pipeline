@@ -88,12 +88,20 @@ class Layout(Contract):
     rows: RowSelection = Field(default_factory=RowSelection)
 
 
+class TargetSpecimen(Contract):
+    """Original table column identifying independent specimens within a file."""
+
+    column: Declared
+    evidence: Declared
+
+
 class TrainingInput(Contract):
     path: Declared
     sample_id: Declared
     layout: Declared
     split: Split
     group_id: Declared | None = None
+    target_specimen: TargetSpecimen | None = None
 
 
 class TrainingDatasetConfig(Contract):

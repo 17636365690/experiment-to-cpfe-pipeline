@@ -1,0 +1,13 @@
+{
+  "doi": "10.17632/v487vwmd7r.1",
+  "url": "https://data.mendeley.com/datasets/v487vwmd7r/1",
+  "title": "Data for: A multi-parameter ultrasonic evaluation of mean grain size using optimization",
+  "contributors": ["Xi Chen", "Guanhua Wu", "Zhenggan Zhou", "chen hao"],
+  "license": "CC-BY-NC-3.0",
+  "license_url": "https://creativecommons.org/licenses/by-nc/3.0/",
+  "published": "2019-05-27",
+  "filename": "DATA.xlsx",
+  "sha256": "7c691e7209776b1fbcf332d9832bbebb60d00cf5d23203f29566ef3fab175e71",
+  "source_kind": "measured",
+  "article_doi": "10.1016/j.ndteint.2019.05.003"
+}

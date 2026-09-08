@@ -1,6 +1,6 @@
 """Build an identity-aligned scalar regression collection from canonical HDF5."""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 import hashlib
 import io
@@ -13,6 +13,7 @@ from experiment_to_cpfe.datasets.package import _load_source
 from experiment_to_cpfe.assets.registry import array_payload_sha256
 from experiment_to_cpfe.datasets.training_columns import select_column
 from experiment_to_cpfe.datasets.training_config import TrainingDatasetConfig
+from experiment_to_cpfe.datasets.training_sources import TargetSourceIndex, register_target_sources
 from experiment_to_cpfe.learning.data_contract import TRAINING_ARRAYS, TRAINING_FORMAT, validate_group_splits
 from experiment_to_cpfe.provenance.hashing import sha256_file
 
@@ -28,43 +29,6 @@ class TrainingDataset:
     metadata: dict
 
 
-@dataclass
-class _TargetSourceIndex:
-    by_digest: dict[str, tuple[str, str]] = field(default_factory=dict)
-    by_uri: dict[str, dict[str | None, tuple[str, str]]] = field(default_factory=dict)
-
-    def register(self, asset, split: str, sample_id: str) -> None:
-        digest = asset.sha256.lower() if asset.sha256 else None
-        uri_records = self.by_uri.setdefault(asset.uri, {})
-        if digest is None:
-            candidates = list(uri_records.values())
-        else:
-            candidates = [self.by_digest.get(digest), uri_records.get(None)]
-        for previous in candidates:
-            if previous is not None and previous[0] != split:
-                raise ValueError(
-                    f"target source {asset.asset_id!r} reused across splits: "
-                    f"sample {previous[1]!r} ({previous[0]}) and {sample_id!r} ({split})"
-                )
-        record = (split, sample_id)
-        uri_records.setdefault(digest, record)
-        if digest is not None:
-            self.by_digest.setdefault(digest, record)
-
-
-def _target_sources(sample, asset_ids, split, group, index: _TargetSourceIndex):
-    assets = {asset.asset_id: asset for asset in sample.assets}
-    for asset_id in set(asset_ids):
-        asset = assets[asset_id]
-        meaning = asset.descriptive_metadata.get("meaning", {})
-        if meaning.get("role") == "target":
-            if meaning.get("split") != split or meaning.get("group_id") != group:
-                raise ValueError(f"target asset {asset_id!r} has conflicting declared group/split")
-        while asset.parent_asset_id is not None:
-            asset = assets[asset.parent_asset_id]
-        index.register(asset, split, sample.metadata.sample_id)
-
-
 def build_training_dataset(config, *, base_dir: Path) -> TrainingDataset:
     """Read explicit inputs; no file creation, Torch dependency or scientific inference."""
     if isinstance(config, TrainingDatasetConfig):
@@ -73,7 +37,7 @@ def build_training_dataset(config, *, base_dir: Path) -> TrainingDataset:
     base_dir = Path(base_dir).resolve()
     chunks, sources = [], []
     seen_paths, seen_hashes = set(), set()
-    target_sources = _TargetSourceIndex()
+    target_sources = TargetSourceIndex()
     quantities = [*config.features, config.target]
     for item in config.inputs:
         source = (base_dir / item.path).resolve()
@@ -116,7 +80,9 @@ def build_training_dataset(config, *, base_dir: Path) -> TrainingDataset:
                     "source_rows": [column.source_rows[index] for index in order],
                     "asset_ids": [column.asset_ids[index] for index in order],
                 }
-            _target_sources(sample, column_records[config.target.name]["asset_ids"], item.split, group, target_sources)
+            partitions = register_target_sources(
+                sample, column_records[config.target.name], layout.columns[config.target.name],
+                item.target_specimen, item.split, group, target_sources)
             chunks.append((np.column_stack(vectors[:-1]), vectors[-1], [group] * len(indices),
                            [item.split] * len(indices), [item.sample_id] * len(indices), row_ids))
             sources.append({"path": str(source), "hdf5_sha256": digest, "layout": item.layout,
@@ -124,7 +90,7 @@ def build_training_dataset(config, *, base_dir: Path) -> TrainingDataset:
                             "assets": [asset.model_dump(mode="json") for asset in sample.assets],
                             "source_manifest": provenance, "solver_inputs": sample.solver_inputs,
                             "group": group, "split": item.split, "row_ids": row_ids,
-                            "columns": column_records})
+                            "columns": column_records, "target_partitions": partitions})
         except (ValueError, KeyError, TypeError, IndexError, OSError) as exc:
             raise ValueError(f"{context}: {exc}") from exc
     arrays = [np.concatenate([chunk[index] for chunk in chunks]) for index in range(6)]

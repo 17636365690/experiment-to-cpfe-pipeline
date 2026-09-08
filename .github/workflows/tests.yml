@@ -39,4 +39,4 @@ jobs:
       - name: Require CPU training dependencies
         run: python -c "import torch; assert torch.version.cuda is None; print(torch.__version__)"
       - name: Build collections and exercise real optimization and checkpoint readback
-        run: python -m pytest -q tests/unit/test_training_dataset.py tests/unit/test_surrogate_training.py tests/integration/test_training_dataset_pipeline.py
+        run: python -m pytest -q tests/unit/test_training_dataset.py tests/unit/test_training_specimens.py tests/unit/test_gh4169_example.py tests/unit/test_surrogate_training.py tests/integration/test_training_dataset_pipeline.py

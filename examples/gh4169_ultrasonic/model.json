@@ -1,0 +1,7 @@
+{
+  "epochs": 1500,
+  "patience": 200,
+  "seed": 17,
+  "hidden": [4],
+  "learning_rate": 0.003
+}

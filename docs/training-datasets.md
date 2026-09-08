@@ -98,7 +98,31 @@ source_unit: V
 
 同一组的所有行属于一个划分，train、validation、test 各至少两行。多个样本可以共用一组。重复样本身份、重复 HDF5 内容、同组跨划分，以及对已有 `dataset_split` 或原生目标 group/split 的冲突都会报错。
 
-构建阶段还检查目标资产的根来源：同一目标根来源出现在不同划分时拒绝构建，共享特征和标定资产不触发此检查。这个规则按来源文件归组，尚未细分同一原始文件中的多个独立试样。内容摘要相同，或同一 URI 的任一记录缺少摘要时，都会检查来源复用。上游需要保留稳定的来源身份。
+构建阶段还检查目标资产的根来源。默认按来源文件归组；同一目标根来源出现在不同划分时拒绝构建，共享特征和标定资产不触发此检查。内容摘要相同，或同一 URI 的任一记录缺少摘要时，都会检查来源复用。上游需要保留稳定的来源身份。
+
+一份原始表格包含多个独立试样时，可为 input 声明原表中的试样身份列：
+
+```yaml
+inputs:
+  - path: coupon-a.h5
+    sample_id: coupon-a
+    layout: specimen
+    split: train
+    target_specimen:
+      column: specimen_id
+      evidence: 原始工作表 A 列是实体试样编号，各行的测量属于该试样
+```
+
+目标选择器必须是表列，且每个选中目标行的 `specimen_id` 必须等于所选 group。
+该列应出现在原生 CSV/TXT/XLSX block 的列映射中，并保留原始 `source_row`、
+`source_sheet` 和经过核验的表转换记录。普通数组或没有原生块来源的表继续使用
+整文件规则。`target_specimen` 不修改来源 URI、摘要或资产父子链。
+
+构建器按原表试样身份及工作表/行检查交集。相同试样的不同测量行、不同试样标签
+指向的同一源行，以及整文件范围与局部试样范围混用，都不能跨划分。
+独立性依据仍由数据使用者提供；编号本身不证明试样来自独立材料批次。
+输出 `dataset.json` 的每个 source 包含 `target_partitions`，保存实际检查的
+试样、源行、身份列和依据。默认整文件来源的该列表为空。
 
 ## 查看构建与训练记录
 
@@ -116,3 +140,6 @@ source_unit: V
 旧的四数组训练 NPZ 和训练配置仍可使用。完整 SamplePackage NPZ 中若已包含 features、targets、groups 和 splits，也保留原有训练入口。对新训练包，`train-surrogate` 还会核对字段顺序、单位及内容记录，格式标记和元数据必须完整。构建器接收项目规范化 HDF5，厂商 HDF5 先通过相应适配器解释和规范化。
 
 [合成示例](../examples/synthetic_training/README.md) 提供两套可直接生成的输入。公开 tensile 案例继续使用原有物理归约和插值步骤，已记录的应变窗口与评估分工保持不变。
+
+[GH4169 超声案例](../examples/gh4169_ultrasonic/README.md) 演示同一工作簿内十个
+试样的规范化、分组训练与小样本评估；原数据和模型按 CC BY-NC 3.0 在本地保存。
